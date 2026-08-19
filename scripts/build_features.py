@@ -161,6 +161,20 @@ team_match_table = pd.concat(
 team_match_table = team_match_table.sort_values(
     ["team", "Date"]
 )
+matches_before = (
+    team_match_table
+    .groupby("team")
+    .cumcount()
+)
+
+team_match_table["has_lag_1_history"] = (
+    matches_before >= 1
+).astype("int8")
+
+team_match_table["has_lag_2_history"] = (
+    matches_before >= 2
+).astype("int8")
+
 
 
 # ============================================================
@@ -189,6 +203,11 @@ for stat in history_stats:
             f"{stat}_lag_{lag}"
         )
 
+history_indicator_columns = [
+    "has_lag_1_history",
+    "has_lag_2_history",
+]
+
 
 # ============================================================
 # 11. SEPARATE HOME AND AWAY HISTORIES
@@ -208,11 +227,11 @@ away_history = team_match_table[
 # ============================================================
 
 home_features = home_history[
-    ["match_id"] + lag_columns
+    ["match_id"] + lag_columns + history_indicator_columns
 ].copy()
 
 away_features = away_history[
-    ["match_id"] + lag_columns
+    ["match_id"] + lag_columns + history_indicator_columns
 ].copy()
 
 
@@ -223,14 +242,14 @@ away_features = away_history[
 home_features = home_features.rename(
     columns={
         column: f"home_{column}"
-        for column in lag_columns
+        for column in lag_columns + history_indicator_columns
     }
 )
 
 away_features = away_features.rename(
     columns={
         column: f"away_{column}"
-        for column in lag_columns
+        for column in lag_columns + history_indicator_columns
     }
 )
 
@@ -281,6 +300,8 @@ model_data.to_csv(
 feature_columns = (
     [f"home_{column}" for column in lag_columns]
     + [f"away_{column}" for column in lag_columns]
+    + [f"home_{column}" for column in history_indicator_columns]
+    + [f"away_{column}" for column in history_indicator_columns]
 )
 
 X = model_data[feature_columns]
@@ -315,3 +336,4 @@ saved_data = pd.read_csv("data/processed/model_data.csv")
 
 print("Saved model data:", saved_data.shape)
 print(saved_data.head())
+
