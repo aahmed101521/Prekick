@@ -16,6 +16,12 @@ required_columns = [
     "AS",
     "HST",
     "AST",
+    "PSCH",
+    "PSCD",
+    "PSCA",
+    "AvgCH",
+    "AvgCD",
+    "AvgCA",
 ]
 
 history_stats = [
@@ -101,7 +107,20 @@ df["match_id"] = df.index
 # 5. CREATE HOME-TEAM PERSPECTIVE
 # ============================================================
 
-home_team_view = df.copy()
+home_team_view = df[
+    [
+        "match_id",
+        "Date",
+        "HomeTeam",
+        "AwayTeam",
+        "FTHG",
+        "FTAG",
+        "HS",
+        "AS",
+        "HST",
+        "AST",
+    ]
+].copy()
 
 home_team_view["team"] = home_team_view["HomeTeam"]
 home_team_view["opponent"] = home_team_view["AwayTeam"]
@@ -121,7 +140,20 @@ home_team_view["sot_against"] = home_team_view["AST"]
 # 6. CREATE AWAY-TEAM PERSPECTIVE
 # ============================================================
 
-away_team_view = df.copy()
+away_team_view = df[
+    [
+        "match_id",
+        "Date",
+        "HomeTeam",
+        "AwayTeam",
+        "FTHG",
+        "FTAG",
+        "HS",
+        "AS",
+        "HST",
+        "AST",
+    ]
+].copy()
 
 away_team_view["team"] = away_team_view["AwayTeam"]
 away_team_view["opponent"] = away_team_view["HomeTeam"]
@@ -276,9 +308,120 @@ match_info = df[
         "HomeTeam",
         "AwayTeam",
         "FTR",
+        "PSCH",
+        "PSCD",
+        "PSCA",
+        "AvgCH",
+        "AvgCD",
+        "AvgCA",
     ]
 ].copy()
 
+pinnacle_complete = match_info[
+    ["PSCH", "PSCD", "PSCA"]
+].notna().all(axis=1)
+
+average_complete = match_info[
+    ["AvgCH", "AvgCD", "AvgCA"]
+].notna().all(axis=1)
+
+match_info["market_odds_source"] = pd.NA
+
+match_info.loc[
+    pinnacle_complete,
+    "market_odds_source",
+] = "Pinnacle"
+
+match_info.loc[
+    ~pinnacle_complete & average_complete,
+    "market_odds_source",
+] = "Average"
+
+match_info["market_home_odds"] = match_info["PSCH"]
+match_info["market_draw_odds"] = match_info["PSCD"]
+match_info["market_away_odds"] = match_info["PSCA"]
+
+fallback_mask = (
+    match_info["market_odds_source"] == "Average"
+)
+
+match_info.loc[
+    fallback_mask,
+    "market_home_odds",
+] = match_info.loc[fallback_mask, "AvgCH"]
+
+match_info.loc[
+    fallback_mask,
+    "market_draw_odds",
+] = match_info.loc[fallback_mask, "AvgCD"]
+
+match_info.loc[
+    fallback_mask,
+    "market_away_odds",
+] = match_info.loc[fallback_mask, "AvgCA"]
+
+selected_market_odds = [
+    "market_home_odds",
+    "market_draw_odds",
+    "market_away_odds",
+]
+
+if match_info[selected_market_odds].isna().any().any():
+    raise ValueError(
+        "Some matches do not have complete market odds."
+    )
+if (match_info[selected_market_odds] <= 1).any().any():
+    raise ValueError(
+        "Some selected market odds are less than or equal to 1."
+    )
+
+match_info["market_raw_home_prob"] = (
+    1 / match_info["market_home_odds"]
+)
+
+match_info["market_raw_draw_prob"] = (
+    1 / match_info["market_draw_odds"]
+)
+
+match_info["market_raw_away_prob"] = (
+    1 / match_info["market_away_odds"]
+)
+
+match_info["market_raw_prob_sum"] = (
+    match_info["market_raw_home_prob"]
+    + match_info["market_raw_draw_prob"]
+    + match_info["market_raw_away_prob"]
+)
+
+match_info["market_overround"] = (
+    match_info["market_raw_prob_sum"] - 1
+)
+
+match_info["market_home_prob"] = (
+    match_info["market_raw_home_prob"]
+    / match_info["market_raw_prob_sum"]
+)
+
+match_info["market_draw_prob"] = (
+    match_info["market_raw_draw_prob"]
+    / match_info["market_raw_prob_sum"]
+)
+
+match_info["market_away_prob"] = (
+    match_info["market_raw_away_prob"]
+    / match_info["market_raw_prob_sum"]
+)
+
+market_prob_sum = (
+    match_info["market_home_prob"]
+    + match_info["market_draw_prob"]
+    + match_info["market_away_prob"]
+)
+
+if (market_prob_sum - 1).abs().gt(1e-12).any():
+    raise ValueError(
+        "Market probabilities do not sum to 1."
+    )
 
 # ============================================================
 # 16. CREATE FINAL MODEL DATASET
