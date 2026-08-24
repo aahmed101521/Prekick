@@ -1,3 +1,8 @@
+import math
+
+from scipy.optimize import minimize_scalar
+
+
 def expected_score(
     team_rating,
     opponent_rating,
@@ -61,6 +66,7 @@ def three_way_probabilities(
 
     return p_home, p_draw, p_away
 
+
 def update_rating(
     rating,
     actual_score,
@@ -115,3 +121,81 @@ def update_match(
     )
 
     return new_home_rating, new_away_rating
+
+
+def fit_draw_parameter(
+    home_ratings,
+    away_ratings,
+    results,
+    home_advantage=100,
+):
+    home_ratings = list(home_ratings)
+    away_ratings = list(away_ratings)
+    results = list(results)
+
+    if not (
+        len(home_ratings)
+        == len(away_ratings)
+        == len(results)
+    ):
+        raise ValueError(
+            "Ratings and results must have the same length."
+        )
+
+    if len(results) == 0:
+        raise ValueError(
+            "At least one match is required."
+        )
+
+    def negative_log_likelihood(
+        draw_parameter,
+    ):
+        total = 0.0
+
+        for (
+            home_rating,
+            away_rating,
+            result,
+        ) in zip(
+            home_ratings,
+            away_ratings,
+            results,
+        ):
+            p_home, p_draw, p_away = (
+                three_way_probabilities(
+                    home_rating,
+                    away_rating,
+                    draw_parameter,
+                    home_advantage=home_advantage,
+                )
+            )
+
+            if result == "H":
+                actual_probability = p_home
+            elif result == "D":
+                actual_probability = p_draw
+            elif result == "A":
+                actual_probability = p_away
+            else:
+                raise ValueError(
+                    "Result must be 'H', 'D', or 'A'."
+                )
+
+            total -= math.log(
+                actual_probability
+            )
+
+        return total
+
+    result = minimize_scalar(
+        negative_log_likelihood,
+        bounds=(1e-6, 10.0),
+        method="bounded",
+    )
+
+    if not result.success:
+        raise RuntimeError(
+            "Draw parameter optimization failed."
+        )
+
+    return result.x

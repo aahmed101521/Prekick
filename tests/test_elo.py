@@ -147,3 +147,78 @@ def test_stronger_home_team_has_higher_home_probability():
     )
 
     assert p_home_stronger > p_home_equal
+
+
+def test_fit_draw_parameter_balanced_example():
+    import pytest
+
+    from prekick.elo import fit_draw_parameter
+
+    fitted = fit_draw_parameter(
+        home_ratings=[
+            1500,
+            1500,
+            1500,
+            1500,
+            1500,
+        ],
+        away_ratings=[
+            1500,
+            1500,
+            1500,
+            1500,
+            1500,
+        ],
+        results=[
+            "H",
+            "H",
+            "D",
+            "A",
+            "A",
+        ],
+        home_advantage=0,
+    )
+
+    assert fitted == pytest.approx(
+        0.5,
+        abs=1e-4,
+    )
+
+
+def test_fit_draw_parameter_rejects_mismatched_lengths():
+    import pytest
+
+    from prekick.elo import fit_draw_parameter
+
+    with pytest.raises(ValueError):
+        fit_draw_parameter(
+            home_ratings=[1500, 1500],
+            away_ratings=[1500],
+            results=["H", "D"],
+        )
+
+
+def test_fit_draw_parameter_rejects_empty_data():
+    import pytest
+
+    from prekick.elo import fit_draw_parameter
+
+    with pytest.raises(ValueError):
+        fit_draw_parameter(
+            home_ratings=[],
+            away_ratings=[],
+            results=[],
+        )
+
+
+def test_fit_draw_parameter_rejects_invalid_result():
+    import pytest
+
+    from prekick.elo import fit_draw_parameter
+
+    with pytest.raises(ValueError):
+        fit_draw_parameter(
+            home_ratings=[1500],
+            away_ratings=[1500],
+            results=["X"],
+        )
