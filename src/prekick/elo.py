@@ -12,6 +12,55 @@ def expected_score(
     )
 
 
+def three_way_probabilities(
+    home_rating,
+    away_rating,
+    draw_parameter,
+    home_advantage=100,
+):
+    if draw_parameter < 0:
+        raise ValueError(
+            "Draw parameter must be non-negative."
+        )
+
+    rating_difference = (
+        home_rating
+        + home_advantage
+        - away_rating
+    )
+
+    strength_ratio = 10 ** (
+        rating_difference / 400
+    )
+
+    draw_strength = (
+        draw_parameter
+        * strength_ratio ** 0.5
+    )
+
+    total_strength = (
+        strength_ratio
+        + draw_strength
+        + 1
+    )
+
+    p_home = (
+        strength_ratio
+        / total_strength
+    )
+
+    p_draw = (
+        draw_strength
+        / total_strength
+    )
+
+    p_away = (
+        1
+        / total_strength
+    )
+
+    return p_home, p_draw, p_away
+
 def update_rating(
     rating,
     actual_score,

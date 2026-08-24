@@ -75,3 +75,75 @@ def test_update_match_invalid_result():
             1500,
             "X",
         )
+
+
+def test_three_way_probabilities_sum_to_one():
+    from prekick.elo import three_way_probabilities
+
+    probabilities = three_way_probabilities(
+        1500,
+        1500,
+        draw_parameter=1.0,
+    )
+
+    assert abs(
+        sum(probabilities) - 1.0
+    ) < 1e-12
+
+
+def test_three_way_probabilities_are_valid():
+    from prekick.elo import three_way_probabilities
+
+    probabilities = three_way_probabilities(
+        1600,
+        1500,
+        draw_parameter=1.0,
+    )
+
+    assert all(
+        0 <= probability <= 1
+        for probability in probabilities
+    )
+
+
+def test_zero_draw_parameter_gives_zero_draw_probability():
+    from prekick.elo import three_way_probabilities
+
+    _, p_draw, _ = three_way_probabilities(
+        1500,
+        1500,
+        draw_parameter=0.0,
+    )
+
+    assert p_draw == 0.0
+
+
+def test_negative_draw_parameter_is_rejected():
+    import pytest
+
+    from prekick.elo import three_way_probabilities
+
+    with pytest.raises(ValueError):
+        three_way_probabilities(
+            1500,
+            1500,
+            draw_parameter=-1.0,
+        )
+
+
+def test_stronger_home_team_has_higher_home_probability():
+    from prekick.elo import three_way_probabilities
+
+    p_home_equal, _, _ = three_way_probabilities(
+        1500,
+        1500,
+        draw_parameter=1.0,
+    )
+
+    p_home_stronger, _, _ = three_way_probabilities(
+        1600,
+        1500,
+        draw_parameter=1.0,
+    )
+
+    assert p_home_stronger > p_home_equal
