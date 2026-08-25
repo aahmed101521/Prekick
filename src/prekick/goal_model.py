@@ -42,3 +42,26 @@ def match_negative_log_likelihood(
     )
 
     return -log(probability)
+
+
+def total_negative_log_likelihood(
+    matches: list[tuple[float, float, int, int]],
+) -> float:
+    """Return the total negative log-likelihood across multiple matches."""
+
+    total_loss = 0.0
+
+    for (
+        home_expected_goals,
+        away_expected_goals,
+        home_goals,
+        away_goals,
+    ) in matches:
+        total_loss += match_negative_log_likelihood(
+            home_expected_goals=home_expected_goals,
+            away_expected_goals=away_expected_goals,
+            home_goals=home_goals,
+            away_goals=away_goals,
+        )
+
+    return total_loss

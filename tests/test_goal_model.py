@@ -3,6 +3,7 @@ import pytest
 from prekick.goal_model import (
     expected_goals,
     match_negative_log_likelihood,
+    total_negative_log_likelihood,
 )
 
 
@@ -28,3 +29,14 @@ def test_match_negative_log_likelihood():
     )
 
     assert loss == pytest.approx(2.4053605156578266)
+
+
+def test_total_negative_log_likelihood():
+    matches = [
+        (1.5, 0.8, 2, 1),
+        (1.2, 1.1, 1, 1),
+    ]
+
+    loss = total_negative_log_likelihood(matches)
+
+    assert loss == pytest.approx(4.427728779059548)
