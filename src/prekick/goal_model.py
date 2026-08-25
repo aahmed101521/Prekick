@@ -1,4 +1,6 @@
-from math import exp
+from math import exp, log
+
+from prekick.poisson import independent_score_probability
 
 
 def expected_goals(
@@ -22,3 +24,21 @@ def expected_goals(
     )
 
     return home_expected_goals, away_expected_goals
+
+
+def match_negative_log_likelihood(
+    home_expected_goals: float,
+    away_expected_goals: float,
+    home_goals: int,
+    away_goals: int,
+) -> float:
+    """Return the negative log-likelihood of an observed scoreline."""
+
+    probability = independent_score_probability(
+        home_expected_goals,
+        away_expected_goals,
+        home_goals,
+        away_goals,
+    )
+
+    return -log(probability)
