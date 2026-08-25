@@ -172,6 +172,9 @@ def fit_goal_model(
         initial_parameters,
         args=(matches, team_index),
         method="BFGS",
+        options={
+            "gtol": 1e-4,
+        },
     )
 
     if not result.success:
