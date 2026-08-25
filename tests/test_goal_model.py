@@ -1,6 +1,7 @@
 import pytest
 
 from prekick.goal_model import (
+    build_team_index,
     expected_goals,
     match_negative_log_likelihood,
     total_negative_log_likelihood,
@@ -40,3 +41,15 @@ def test_total_negative_log_likelihood():
     loss = total_negative_log_likelihood(matches)
 
     assert loss == pytest.approx(4.427728779059548)
+
+
+def test_build_team_index():
+    team_index = build_team_index(
+        ["Chelsea", "Arsenal", "Liverpool"]
+    )
+
+    assert team_index == {
+        "Arsenal": 0,
+        "Chelsea": 1,
+        "Liverpool": 2,
+    }

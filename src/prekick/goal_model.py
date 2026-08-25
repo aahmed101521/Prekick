@@ -65,3 +65,12 @@ def total_negative_log_likelihood(
         )
 
     return total_loss
+
+
+def build_team_index(teams: list[str]) -> dict[str, int]:
+    """Return a mapping from team name to parameter index."""
+
+    return {
+        team: index
+        for index, team in enumerate(sorted(teams))
+    }
