@@ -106,3 +106,46 @@ def unpack_parameters(
     home_advantage = parameters[-1]
 
     return attacks, defences, home_advantage
+
+
+def model_negative_log_likelihood(
+    parameters: list[float],
+    matches: list[tuple[str, str, int, int]],
+    team_index: dict[str, int],
+) -> float:
+    """Return total model loss for observed matches."""
+
+    number_of_teams = len(team_index)
+
+    attacks, defences, home_advantage = unpack_parameters(
+        parameters,
+        number_of_teams,
+    )
+
+    total_loss = 0.0
+
+    for (
+        home_team,
+        away_team,
+        home_goals,
+        away_goals,
+    ) in matches:
+        home_index = team_index[home_team]
+        away_index = team_index[away_team]
+
+        home_expected_goals, away_expected_goals = expected_goals(
+            home_attack=attacks[home_index],
+            home_defence=defences[home_index],
+            away_attack=attacks[away_index],
+            away_defence=defences[away_index],
+            home_advantage=home_advantage,
+        )
+
+        total_loss += match_negative_log_likelihood(
+            home_expected_goals=home_expected_goals,
+            away_expected_goals=away_expected_goals,
+            home_goals=home_goals,
+            away_goals=away_goals,
+        )
+
+    return total_loss

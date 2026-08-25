@@ -4,6 +4,7 @@ from prekick.goal_model import (
     build_team_index,
     expected_goals,
     match_negative_log_likelihood,
+    model_negative_log_likelihood,
     total_negative_log_likelihood,
     unpack_parameters,
 )
@@ -66,3 +67,35 @@ def test_unpack_parameters():
     assert defences == pytest.approx([0.3, 0.0, -0.2])
     assert home_advantage == pytest.approx(0.25)
     assert sum(attacks) == pytest.approx(0.0)
+
+
+def test_model_negative_log_likelihood():
+    teams = [
+        "Arsenal",
+        "Chelsea",
+        "Liverpool",
+    ]
+
+    team_index = build_team_index(teams)
+
+    parameters = [
+        0.2,
+        -0.1,
+        0.3,
+        0.0,
+        -0.2,
+        0.25,
+    ]
+
+    matches = [
+        ("Arsenal", "Chelsea", 2, 1),
+        ("Liverpool", "Arsenal", 1, 1),
+    ]
+
+    loss = model_negative_log_likelihood(
+        parameters,
+        matches,
+        team_index,
+    )
+
+    assert loss == pytest.approx(4.501174309700453)
