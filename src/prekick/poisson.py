@@ -35,3 +35,33 @@ def independent_score_probability(
     )
 
     return home_probability * away_probability
+
+
+def match_outcome_probabilities(
+    home_expected_goals: float,
+    away_expected_goals: float,
+    max_goals: int = 10,
+) -> tuple[float, float, float]:
+    """Return independent Poisson home, draw, and away probabilities."""
+
+    home_probability = 0.0
+    draw_probability = 0.0
+    away_probability = 0.0
+
+    for home_goals in range(max_goals + 1):
+        for away_goals in range(max_goals + 1):
+            score_probability = independent_score_probability(
+                home_expected_goals,
+                away_expected_goals,
+                home_goals,
+                away_goals,
+            )
+
+            if home_goals > away_goals:
+                home_probability += score_probability
+            elif home_goals == away_goals:
+                draw_probability += score_probability
+            else:
+                away_probability += score_probability
+
+    return home_probability, draw_probability, away_probability
