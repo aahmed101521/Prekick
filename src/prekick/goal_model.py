@@ -69,7 +69,9 @@ def total_negative_log_likelihood(
     return total_loss
 
 
-def build_team_index(teams: list[str]) -> dict[str, int]:
+def build_team_index(
+    teams: list[str],
+) -> dict[str, int]:
     """Return a mapping from team name to parameter index."""
 
     return {
@@ -91,7 +93,11 @@ def get_team_parameters(
 
     if team in team_index:
         index = team_index[team]
-        return attacks[index], defences[index]
+
+        return (
+            attacks[index],
+            defences[index],
+        )
 
     mean_defence = sum(defences) / len(defences)
 
@@ -114,7 +120,9 @@ def unpack_parameters(
             f"received {len(parameter_values)}."
         )
 
-    fitted_attacks = parameter_values[: number_of_teams - 1]
+    fitted_attacks = parameter_values[
+        : number_of_teams - 1
+    ]
 
     final_attack = -sum(fitted_attacks)
 
@@ -133,7 +141,7 @@ def unpack_parameters(
 
 
 def model_negative_log_likelihood(
-    parameters: list[float],
+    parameters,
     matches: list[tuple[str, str, int, int]],
     team_index: dict[str, int],
 ) -> float:
@@ -157,7 +165,10 @@ def model_negative_log_likelihood(
         home_index = team_index[home_team]
         away_index = team_index[away_team]
 
-        home_expected_goals, away_expected_goals = expected_goals(
+        (
+            home_expected_goals,
+            away_expected_goals,
+        ) = expected_goals(
             home_attack=attacks[home_index],
             home_defence=defences[home_index],
             away_attack=attacks[away_index],
@@ -175,6 +186,39 @@ def model_negative_log_likelihood(
     return total_loss
 
 
+def regularized_model_negative_log_likelihood(
+    parameters,
+    matches: list[tuple[str, str, int, int]],
+    team_index: dict[str, int],
+    penalty_strength: float,
+) -> float:
+    """Return model loss with L2 regularization."""
+
+    likelihood_loss = model_negative_log_likelihood(
+        parameters,
+        matches,
+        team_index,
+    )
+
+    attacks, defences, _ = unpack_parameters(
+        parameters,
+        len(team_index),
+    )
+
+    penalty = penalty_strength * (
+        sum(
+            value**2
+            for value in attacks
+        )
+        + sum(
+            value**2
+            for value in defences
+        )
+    )
+
+    return likelihood_loss + penalty
+
+
 def fit_goal_model(
     matches: list[tuple[str, str, int, int]],
     teams: list[str],
@@ -185,16 +229,21 @@ def fit_goal_model(
 
     number_of_teams = len(team_index)
 
-    initial_parameters = [0.0] * (2 * number_of_teams)
+    initial_parameters = [
+        0.0
+    ] * (2 * number_of_teams)
+
+    penalty_strength = 1.0
 
     result = minimize(
-        model_negative_log_likelihood,
+        regularized_model_negative_log_likelihood,
         initial_parameters,
-        args=(matches, team_index),
-        method="BFGS",
-        options={
-            "gtol": 1e-4,
-        },
+        args=(
+            matches,
+            team_index,
+            penalty_strength,
+        ),
+        method="L-BFGS-B",
     )
 
     if not result.success:
@@ -203,7 +252,7 @@ def fit_goal_model(
         )
 
     attacks, defences, home_advantage = unpack_parameters(
-        result.x.tolist(),
+        result.x,
         number_of_teams,
     )
 

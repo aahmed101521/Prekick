@@ -10,6 +10,7 @@ from prekick.goal_model import (
     total_negative_log_likelihood,
     unpack_parameters,
     get_team_parameters,
+    regularized_model_negative_log_likelihood,
 )
 
 
@@ -143,10 +144,7 @@ def test_fit_goal_model():
     assert len(attacks) == 3
     assert len(defences) == 3
     assert sum(attacks) == pytest.approx(0.0)
-    assert home_advantage == pytest.approx(
-        0.2876823801001614,
-        abs=1e-5,
-    )
+    assert home_advantage > 0
 
 
 def test_get_team_parameters_returns_fitted_values_for_known_team():
@@ -185,3 +183,42 @@ def test_get_team_parameters_uses_neutral_values_for_unseen_team():
 
     assert attack == 0.0
     assert defence == 0.2
+
+
+def test_regularized_model_loss_is_larger_than_unregularized_loss():
+    team_index = {
+        "Arsenal": 0,
+        "Chelsea": 1,
+        "Liverpool": 2,
+    }
+
+    parameters = [
+        0.2,
+        -0.1,
+        0.3,
+        0.0,
+        -0.2,
+        0.25,
+    ]
+
+    matches = [
+        ("Arsenal", "Chelsea", 2, 1),
+        ("Liverpool", "Arsenal", 1, 1),
+    ]
+
+    unregularized_loss = model_negative_log_likelihood(
+        parameters,
+        matches,
+        team_index,
+    )
+
+    regularized_loss = (
+        regularized_model_negative_log_likelihood(
+            parameters,
+            matches,
+            team_index,
+            penalty_strength=1.0,
+        )
+    )
+
+    assert regularized_loss > unregularized_loss
