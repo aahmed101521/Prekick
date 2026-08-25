@@ -1,5 +1,10 @@
 import pandas as pd
 
+from prekick.elo import (
+    fit_draw_parameter,
+    three_way_probabilities,
+)
+
 
 # ============================================================
 # 1. LOAD PROCESSED MATCH DATA
@@ -10,6 +15,33 @@ data = pd.read_csv(
     parse_dates=["Date"],
 )
 
+elo_history = pd.read_csv(
+    "data/processed/elo_history.csv",
+    parse_dates=["Date"],
+)
+
+elo_columns = [
+    "match_id",
+    "home_elo_before",
+    "away_elo_before",
+]
+
+data = data.merge(
+    elo_history[elo_columns],
+    on="match_id",
+    how="left",
+    validate="one_to_one",
+)
+
+if data[
+    [
+        "home_elo_before",
+        "away_elo_before",
+    ]
+].isna().any().any():
+    raise ValueError(
+        "Some matches are missing Elo ratings."
+    )
 
 # ============================================================
 # 2. DEFINE BACKTEST PERIOD
@@ -38,7 +70,7 @@ print("Prediction-date blocks:", len(prediction_dates))
 
 
 # ============================================================
-# 4. WALK-FORWARD BASE-RATE PREDICTIONS
+# 4. WALK-FORWARD BASE-RATE AND ELO PREDICTIONS
 # ============================================================
 
 prediction_blocks = []
@@ -50,8 +82,9 @@ for prediction_date in prediction_dates:
 
     predict_data = data[
         data["Date"] == prediction_date
-    ]
+    ].copy()
 
+    # Base-rate probabilities
     home_rate = (
         (train_data["FTR"] == "H").mean()
     )
@@ -64,14 +97,39 @@ for prediction_date in prediction_dates:
         (train_data["FTR"] == "A").mean()
     )
 
-    predict_data = predict_data.copy()
-
     predict_data["base_rate_home_prob"] = home_rate
     predict_data["base_rate_draw_prob"] = draw_rate
     predict_data["base_rate_away_prob"] = away_rate
 
-    prediction_blocks.append(predict_data)
+    # Fit the Elo draw parameter using past matches only
+    draw_parameter = fit_draw_parameter(
+        train_data["home_elo_before"],
+        train_data["away_elo_before"],
+        train_data["FTR"],
+    )
 
+    predict_data["elo_draw_parameter"] = (
+        draw_parameter
+    )
+
+    elo_probabilities = [
+        three_way_probabilities(
+            row.home_elo_before,
+            row.away_elo_before,
+            draw_parameter,
+        )
+        for row in predict_data.itertuples()
+    ]
+
+    (
+        predict_data["elo_home_prob"],
+        predict_data["elo_draw_prob"],
+        predict_data["elo_away_prob"],
+    ) = zip(*elo_probabilities)
+
+    prediction_blocks.append(
+        predict_data
+    )
 
 # ============================================================
 # 5. COMBINE ALL WALK-FORWARD PREDICTIONS
@@ -97,6 +155,10 @@ output_columns = [
     "base_rate_home_prob",
     "base_rate_draw_prob",
     "base_rate_away_prob",
+    "elo_draw_parameter",
+    "elo_home_prob",
+    "elo_draw_prob",
+    "elo_away_prob",
     "market_home_prob",
     "market_draw_prob",
     "market_away_prob",
@@ -176,7 +238,53 @@ print(
 )
 
 # ============================================================
-# 10. SAVE BACKTEST PREDICTIONS
+# 10. VALIDATE ELO PROBABILITIES
+# ============================================================
+
+elo_probability_columns = [
+    "elo_home_prob",
+    "elo_draw_prob",
+    "elo_away_prob",
+]
+
+if backtest_output[
+    elo_probability_columns
+].isna().any().any():
+    raise ValueError(
+        "Some backtest matches have missing Elo probabilities."
+    )
+
+if not backtest_output[
+    elo_probability_columns
+].apply(
+    lambda column: column.between(0, 1).all()
+).all():
+    raise ValueError(
+        "Some Elo probabilities are outside 0 to 1."
+    )
+
+elo_prob_sum = (
+    backtest_output["elo_home_prob"]
+    + backtest_output["elo_draw_prob"]
+    + backtest_output["elo_away_prob"]
+)
+
+if (elo_prob_sum - 1).abs().gt(1e-12).any():
+    raise ValueError(
+        "Some Elo probabilities do not sum to 1."
+    )
+
+if (
+    backtest_output["elo_draw_parameter"]
+    <= 0
+).any():
+    raise ValueError(
+        "Some Elo draw parameters are not positive."
+    )
+
+
+# ============================================================
+# 11. SAVE BACKTEST PREDICTIONS
 # ============================================================
 
 backtest_output.to_csv(

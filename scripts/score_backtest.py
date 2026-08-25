@@ -22,6 +22,10 @@ def score_row(
     )
 
 
+# ============================================================
+# SCORE BASE-RATE PREDICTIONS
+# ============================================================
+
 base_rate_scores = backtest.apply(
     lambda row: score_row(
         row,
@@ -31,6 +35,26 @@ base_rate_scores = backtest.apply(
     ),
     axis=1,
 )
+
+
+# ============================================================
+# SCORE ELO PREDICTIONS
+# ============================================================
+
+elo_scores = backtest.apply(
+    lambda row: score_row(
+        row,
+        "elo_home_prob",
+        "elo_draw_prob",
+        "elo_away_prob",
+    ),
+    axis=1,
+)
+
+
+# ============================================================
+# SCORE MARKET PREDICTIONS
+# ============================================================
 
 market_scores = backtest.apply(
     lambda row: score_row(
@@ -42,6 +66,10 @@ market_scores = backtest.apply(
     axis=1,
 )
 
+
+# ============================================================
+# ADD BASE-RATE SCORES
+# ============================================================
 
 backtest["base_rate_rps"] = [
     scores["rps"]
@@ -59,6 +87,30 @@ backtest["base_rate_brier"] = [
 ]
 
 
+# ============================================================
+# ADD ELO SCORES
+# ============================================================
+
+backtest["elo_rps"] = [
+    scores["rps"]
+    for scores in elo_scores
+]
+
+backtest["elo_log_loss"] = [
+    scores["log_loss"]
+    for scores in elo_scores
+]
+
+backtest["elo_brier"] = [
+    scores["brier"]
+    for scores in elo_scores
+]
+
+
+# ============================================================
+# ADD MARKET SCORES
+# ============================================================
+
 backtest["market_rps"] = [
     scores["rps"]
     for scores in market_scores
@@ -75,35 +127,41 @@ backtest["market_brier"] = [
 ]
 
 
-print("Scored matches:", len(backtest))
+# ============================================================
+# SUMMARY
+# ============================================================
 
 print(
-    backtest[
-        [
-            "base_rate_rps",
-            "base_rate_log_loss",
-            "base_rate_brier",
-            "market_rps",
-            "market_log_loss",
-            "market_brier",
-        ]
-    ].mean()
+    "Scored matches:",
+    len(backtest),
 )
 
-# ============================================================
-# SAVE SCORED BACKTEST
-# ============================================================
-
-score_columns = [
+summary_columns = [
     "base_rate_rps",
     "base_rate_log_loss",
     "base_rate_brier",
+    "elo_rps",
+    "elo_log_loss",
+    "elo_brier",
     "market_rps",
     "market_log_loss",
     "market_brier",
 ]
 
-if backtest[score_columns].isna().any().any():
+print(
+    backtest[
+        summary_columns
+    ].mean()
+)
+
+
+# ============================================================
+# VALIDATE SCORED BACKTEST
+# ============================================================
+
+if backtest[
+    summary_columns
+].isna().any().any():
     raise ValueError(
         "Some backtest scores are missing."
     )
@@ -117,6 +175,11 @@ if backtest["match_id"].duplicated().any():
     raise ValueError(
         "Duplicate match IDs found in scored backtest."
     )
+
+
+# ============================================================
+# SAVE SCORED BACKTEST
+# ============================================================
 
 backtest.to_csv(
     "predictions/backtest_scored.csv",
