@@ -64,4 +64,14 @@ def match_outcome_probabilities(
             else:
                 away_probability += score_probability
 
-    return home_probability, draw_probability, away_probability
+    total_probability = (
+        home_probability
+        + draw_probability
+        + away_probability
+    )
+
+    return (
+        home_probability / total_probability,
+        draw_probability / total_probability,
+        away_probability / total_probability,
+    )
