@@ -1,8 +1,10 @@
 import pytest
+import numpy as np
 
 from prekick.goal_model import (
     build_team_index,
     expected_goals,
+    fit_goal_model,
     match_negative_log_likelihood,
     model_negative_log_likelihood,
     total_negative_log_likelihood,
@@ -99,3 +101,48 @@ def test_model_negative_log_likelihood():
     )
 
     assert loss == pytest.approx(4.501174309700453)
+
+
+def test_unpack_parameters_accepts_numpy_array():
+    parameters = np.array(
+        [0.2, -0.1, 0.3, 0.0, -0.2, 0.25]
+    )
+
+    attacks, defences, home_advantage = unpack_parameters(
+        parameters,
+        number_of_teams=3,
+    )
+
+    assert attacks == pytest.approx([0.2, -0.1, -0.1])
+    assert defences == pytest.approx([0.3, 0.0, -0.2])
+    assert home_advantage == pytest.approx(0.25)
+
+
+def test_fit_goal_model():
+    teams = [
+        "Arsenal",
+        "Chelsea",
+        "Liverpool",
+    ]
+
+    matches = [
+        ("Arsenal", "Chelsea", 2, 1),
+        ("Chelsea", "Arsenal", 1, 1),
+        ("Arsenal", "Liverpool", 1, 0),
+        ("Liverpool", "Arsenal", 1, 1),
+        ("Chelsea", "Liverpool", 1, 2),
+        ("Liverpool", "Chelsea", 2, 1),
+    ]
+
+    attacks, defences, home_advantage = fit_goal_model(
+        matches,
+        teams,
+    )
+
+    assert len(attacks) == 3
+    assert len(defences) == 3
+    assert sum(attacks) == pytest.approx(0.0)
+    assert home_advantage == pytest.approx(
+        0.2876823801001614,
+        abs=1e-5,
+    )

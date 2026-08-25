@@ -1,5 +1,7 @@
 from math import exp, log
 
+from scipy.optimize import minimize
+
 from prekick.poisson import independent_score_probability
 
 
@@ -77,20 +79,22 @@ def build_team_index(teams: list[str]) -> dict[str, int]:
 
 
 def unpack_parameters(
-    parameters: list[float],
+    parameters,
     number_of_teams: int,
 ) -> tuple[list[float], list[float], float]:
     """Split optimizer parameters into attack, defence, and home advantage."""
 
+    parameter_values = list(parameters)
+
     expected_parameter_count = 2 * number_of_teams
 
-    if len(parameters) != expected_parameter_count:
+    if len(parameter_values) != expected_parameter_count:
         raise ValueError(
             f"Expected {expected_parameter_count} parameters, "
-            f"received {len(parameters)}."
+            f"received {len(parameter_values)}."
         )
 
-    fitted_attacks = parameters[: number_of_teams - 1]
+    fitted_attacks = parameter_values[: number_of_teams - 1]
 
     final_attack = -sum(fitted_attacks)
 
@@ -99,11 +103,11 @@ def unpack_parameters(
     defence_start = number_of_teams - 1
     defence_end = defence_start + number_of_teams
 
-    defences = parameters[
+    defences = parameter_values[
         defence_start:defence_end
     ]
 
-    home_advantage = parameters[-1]
+    home_advantage = parameter_values[-1]
 
     return attacks, defences, home_advantage
 
@@ -149,3 +153,35 @@ def model_negative_log_likelihood(
         )
 
     return total_loss
+
+
+def fit_goal_model(
+    matches: list[tuple[str, str, int, int]],
+    teams: list[str],
+):
+    """Fit attack, defence, and home-advantage parameters."""
+
+    team_index = build_team_index(teams)
+
+    number_of_teams = len(team_index)
+
+    initial_parameters = [0.0] * (2 * number_of_teams)
+
+    result = minimize(
+        model_negative_log_likelihood,
+        initial_parameters,
+        args=(matches, team_index),
+        method="BFGS",
+    )
+
+    if not result.success:
+        raise RuntimeError(
+            f"Goal model optimization failed: {result.message}"
+        )
+
+    attacks, defences, home_advantage = unpack_parameters(
+        result.x.tolist(),
+        number_of_teams,
+    )
+
+    return attacks, defences, home_advantage
