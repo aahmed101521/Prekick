@@ -74,3 +74,35 @@ def build_team_index(teams: list[str]) -> dict[str, int]:
         team: index
         for index, team in enumerate(sorted(teams))
     }
+
+
+def unpack_parameters(
+    parameters: list[float],
+    number_of_teams: int,
+) -> tuple[list[float], list[float], float]:
+    """Split optimizer parameters into attack, defence, and home advantage."""
+
+    expected_parameter_count = 2 * number_of_teams
+
+    if len(parameters) != expected_parameter_count:
+        raise ValueError(
+            f"Expected {expected_parameter_count} parameters, "
+            f"received {len(parameters)}."
+        )
+
+    fitted_attacks = parameters[: number_of_teams - 1]
+
+    final_attack = -sum(fitted_attacks)
+
+    attacks = fitted_attacks + [final_attack]
+
+    defence_start = number_of_teams - 1
+    defence_end = defence_start + number_of_teams
+
+    defences = parameters[
+        defence_start:defence_end
+    ]
+
+    home_advantage = parameters[-1]
+
+    return attacks, defences, home_advantage
