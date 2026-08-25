@@ -193,6 +193,7 @@ team_match_table = pd.concat(
 team_match_table = team_match_table.sort_values(
     ["team", "Date"]
 )
+
 matches_before = (
     team_match_table
     .groupby("team")
@@ -206,7 +207,6 @@ team_match_table["has_lag_1_history"] = (
 team_match_table["has_lag_2_history"] = (
     matches_before >= 2
 ).astype("int8")
-
 
 
 # ============================================================
@@ -307,6 +307,8 @@ match_info = df[
         "season",
         "HomeTeam",
         "AwayTeam",
+        "FTHG",
+        "FTAG",
         "FTR",
         "PSCH",
         "PSCD",
@@ -370,6 +372,7 @@ if match_info[selected_market_odds].isna().any().any():
     raise ValueError(
         "Some matches do not have complete market odds."
     )
+
 if (match_info[selected_market_odds] <= 1).any().any():
     raise ValueError(
         "Some selected market odds are less than or equal to 1."
@@ -423,6 +426,7 @@ if (market_prob_sum - 1).abs().gt(1e-12).any():
         "Market probabilities do not sum to 1."
     )
 
+
 # ============================================================
 # 16. CREATE FINAL MODEL DATASET
 # ============================================================
@@ -431,10 +435,12 @@ model_data = match_info.merge(
     match_features,
     on="match_id",
 )
+
 model_data.to_csv(
     "data/processed/model_data.csv",
     index=False,
 )
+
 
 # ============================================================
 # 17. DEFINE MODEL FEATURES X AND TARGET y
@@ -475,8 +481,9 @@ print(
     X.isna().any(axis=1).sum(),
 )
 
-saved_data = pd.read_csv("data/processed/model_data.csv")
+saved_data = pd.read_csv(
+    "data/processed/model_data.csv"
+)
 
 print("Saved model data:", saved_data.shape)
 print(saved_data.head())
-
