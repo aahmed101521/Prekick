@@ -78,6 +78,26 @@ def build_team_index(teams: list[str]) -> dict[str, int]:
     }
 
 
+def get_team_parameters(
+    team: str,
+    team_index: dict[str, int],
+    attacks: list[float],
+    defences: list[float],
+) -> tuple[float, float]:
+    """Return attack and defence parameters for a team.
+
+    Unseen teams receive neutral attack strength and the mean fitted defence.
+    """
+
+    if team in team_index:
+        index = team_index[team]
+        return attacks[index], defences[index]
+
+    mean_defence = sum(defences) / len(defences)
+
+    return 0.0, mean_defence
+
+
 def unpack_parameters(
     parameters,
     number_of_teams: int,

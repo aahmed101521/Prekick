@@ -9,6 +9,7 @@ from prekick.goal_model import (
     model_negative_log_likelihood,
     total_negative_log_likelihood,
     unpack_parameters,
+    get_team_parameters,
 )
 
 
@@ -146,3 +147,41 @@ def test_fit_goal_model():
         0.2876823801001614,
         abs=1e-5,
     )
+
+
+def test_get_team_parameters_returns_fitted_values_for_known_team():
+    team_index = {
+        "Arsenal": 0,
+        "Chelsea": 1,
+    }
+    attacks = [0.2, -0.2]
+    defences = [0.1, 0.3]
+
+    attack, defence = get_team_parameters(
+        "Arsenal",
+        team_index,
+        attacks,
+        defences,
+    )
+
+    assert attack == 0.2
+    assert defence == 0.1
+
+
+def test_get_team_parameters_uses_neutral_values_for_unseen_team():
+    team_index = {
+        "Arsenal": 0,
+        "Chelsea": 1,
+    }
+    attacks = [0.2, -0.2]
+    defences = [0.1, 0.3]
+
+    attack, defence = get_team_parameters(
+        "Fulham",
+        team_index,
+        attacks,
+        defences,
+    )
+
+    assert attack == 0.0
+    assert defence == 0.2
