@@ -1,8 +1,9 @@
 from math import log
 
-from scipy.optimize import minimize_scalar
+from scipy.optimize import minimize, minimize_scalar
 
 from prekick.goal_model import (
+    build_team_index,
     expected_goals,
     unpack_parameters,
 )
@@ -238,6 +239,53 @@ def regularized_dixon_coles_model_negative_log_likelihood(
     )
 
     return model_loss + penalty
+
+
+def fit_dixon_coles_model(
+    matches: list[tuple[str, str, int, int]],
+    teams: list[str],
+) -> tuple[list[float], list[float], float, float]:
+    """Fit attack, defence, home advantage, and Dixon-Coles rho."""
+
+    team_index = build_team_index(teams)
+    number_of_teams = len(team_index)
+
+    number_of_parameters = (
+        2 * number_of_teams + 1
+    )
+
+    initial_parameters = [
+        0.0
+    ] * number_of_parameters
+
+    penalty_strength = 1.0
+
+    bounds = (
+        [(None, None)] * (number_of_parameters - 1)
+        + [(-0.2, 0.2)]
+    )
+
+    result = minimize(
+        regularized_dixon_coles_model_negative_log_likelihood,
+        initial_parameters,
+        args=(
+            matches,
+            team_index,
+            penalty_strength,
+        ),
+        method="L-BFGS-B",
+        bounds=bounds,
+    )
+
+    if not result.success:
+        raise RuntimeError(
+            f"Dixon-Coles optimization failed: {result.message}"
+        )
+
+    return unpack_dixon_coles_parameters(
+        result.x,
+        number_of_teams,
+    )
 
 
 def fit_rho(

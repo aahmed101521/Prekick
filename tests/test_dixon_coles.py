@@ -6,6 +6,7 @@ from prekick.dixon_coles import (
     dixon_coles_match_outcome_probabilities,
     dixon_coles_model_negative_log_likelihood,
     dixon_coles_score_probability,
+    fit_dixon_coles_model,
     fit_rho,
     regularized_dixon_coles_model_negative_log_likelihood,
     total_dixon_coles_negative_log_likelihood,
@@ -342,3 +343,33 @@ def test_regularized_dixon_coles_model_negative_log_likelihood():
     )
 
     assert regularized_loss > unregularized_loss
+
+
+def test_fit_dixon_coles_model():
+    teams = [
+        "Team A",
+        "Team B",
+    ]
+
+    matches = [
+        ("Team A", "Team B", 1, 0),
+        ("Team B", "Team A", 0, 1),
+        ("Team A", "Team B", 1, 1),
+        ("Team B", "Team A", 0, 0),
+    ]
+
+    (
+        attacks,
+        defences,
+        home_advantage,
+        rho,
+    ) = fit_dixon_coles_model(
+        matches,
+        teams,
+    )
+
+    assert len(attacks) == 2
+    assert len(defences) == 2
+    assert sum(attacks) == pytest.approx(0.0)
+    assert isinstance(home_advantage, float)
+    assert -0.2 <= rho <= 0.2
