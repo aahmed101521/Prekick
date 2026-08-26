@@ -13,6 +13,9 @@ from prekick.dixon_coles import (
     unpack_dixon_coles_parameters,
 )
 from prekick.poisson import match_outcome_probabilities
+from prekick.goal_model import (
+    model_negative_log_likelihood,
+)
 
 
 def test_dixon_coles_correction_for_zero_zero():
@@ -373,3 +376,47 @@ def test_fit_dixon_coles_model():
     assert sum(attacks) == pytest.approx(0.0)
     assert isinstance(home_advantage, float)
     assert -0.2 <= rho <= 0.2
+
+
+def test_dixon_coles_matches_poisson_likelihood_when_rho_is_zero():
+    team_index = {
+        "Team A": 0,
+        "Team B": 1,
+    }
+
+    goal_parameters = [
+        0.2,
+        0.1,
+        -0.1,
+        0.15,
+    ]
+
+    dixon_coles_parameters = [
+        0.2,
+        0.1,
+        -0.1,
+        0.15,
+        0.0,
+    ]
+
+    matches = [
+        ("Team A", "Team B", 1, 0),
+        ("Team B", "Team A", 0, 1),
+        ("Team A", "Team B", 1, 1),
+    ]
+
+    poisson_loss = model_negative_log_likelihood(
+        goal_parameters,
+        matches,
+        team_index,
+    )
+
+    dixon_coles_loss = dixon_coles_model_negative_log_likelihood(
+        dixon_coles_parameters,
+        matches,
+        team_index,
+    )
+
+    assert dixon_coles_loss == pytest.approx(
+        poisson_loss
+    )
