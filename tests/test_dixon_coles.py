@@ -1,6 +1,9 @@
 import pytest
 
-from prekick.dixon_coles import dixon_coles_correction
+from prekick.dixon_coles import (
+    dixon_coles_correction,
+    dixon_coles_score_probability,
+)
 
 
 def test_dixon_coles_correction_for_zero_zero():
@@ -61,3 +64,31 @@ def test_dixon_coles_correction_is_one_for_other_scores():
     )
 
     assert correction == 1.0
+
+
+def test_dixon_coles_score_probability_adjusts_low_score():
+    probability = dixon_coles_score_probability(
+        home_expected_goals=1.5,
+        away_expected_goals=0.8,
+        home_goals=0,
+        away_goals=0,
+        rho=-0.1,
+    )
+
+    assert probability == pytest.approx(
+        0.10025884372280375 * 1.12
+    )
+
+
+def test_dixon_coles_score_probability_leaves_other_score_unchanged():
+    probability = dixon_coles_score_probability(
+        home_expected_goals=1.5,
+        away_expected_goals=0.8,
+        home_goals=2,
+        away_goals=1,
+        rho=-0.1,
+    )
+
+    assert probability == pytest.approx(
+        0.09023295935052335
+    )
