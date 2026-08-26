@@ -3,10 +3,59 @@ import pandas as pd
 from prekick.scoring import score_prediction
 
 
+# ============================================================
+# 1. LOAD BACKTEST PREDICTIONS
+# ============================================================
+
 backtest = pd.read_csv(
     "predictions/backtest_predictions.csv"
 )
 
+poisson = pd.read_csv(
+    "predictions/poisson_backtest_predictions.csv"
+)
+
+
+# ============================================================
+# 2. MERGE POISSON PREDICTIONS
+# ============================================================
+
+poisson_columns = [
+    "match_id",
+    "poisson_home_xg",
+    "poisson_away_xg",
+    "poisson_home_prob",
+    "poisson_draw_prob",
+    "poisson_away_prob",
+]
+
+backtest = backtest.merge(
+    poisson[poisson_columns],
+    on="match_id",
+    how="left",
+    validate="one_to_one",
+)
+
+if len(backtest) != 1520:
+    raise ValueError(
+        "Merged backtest does not contain the expected 1520 matches."
+    )
+
+if backtest[
+    [
+        "poisson_home_prob",
+        "poisson_draw_prob",
+        "poisson_away_prob",
+    ]
+].isna().any().any():
+    raise ValueError(
+        "Some matches are missing Poisson predictions."
+    )
+
+
+# ============================================================
+# 3. DEFINE SHARED ROW-SCORING FUNCTION
+# ============================================================
 
 def score_row(
     row,
@@ -23,7 +72,7 @@ def score_row(
 
 
 # ============================================================
-# SCORE BASE-RATE PREDICTIONS
+# 4. SCORE BASE-RATE PREDICTIONS
 # ============================================================
 
 base_rate_scores = backtest.apply(
@@ -38,7 +87,7 @@ base_rate_scores = backtest.apply(
 
 
 # ============================================================
-# SCORE ELO PREDICTIONS
+# 5. SCORE ELO PREDICTIONS
 # ============================================================
 
 elo_scores = backtest.apply(
@@ -53,7 +102,22 @@ elo_scores = backtest.apply(
 
 
 # ============================================================
-# SCORE MARKET PREDICTIONS
+# 6. SCORE POISSON PREDICTIONS
+# ============================================================
+
+poisson_scores = backtest.apply(
+    lambda row: score_row(
+        row,
+        "poisson_home_prob",
+        "poisson_draw_prob",
+        "poisson_away_prob",
+    ),
+    axis=1,
+)
+
+
+# ============================================================
+# 7. SCORE MARKET PREDICTIONS
 # ============================================================
 
 market_scores = backtest.apply(
@@ -68,7 +132,7 @@ market_scores = backtest.apply(
 
 
 # ============================================================
-# ADD BASE-RATE SCORES
+# 8. ADD BASE-RATE SCORES
 # ============================================================
 
 backtest["base_rate_rps"] = [
@@ -88,7 +152,7 @@ backtest["base_rate_brier"] = [
 
 
 # ============================================================
-# ADD ELO SCORES
+# 9. ADD ELO SCORES
 # ============================================================
 
 backtest["elo_rps"] = [
@@ -108,7 +172,27 @@ backtest["elo_brier"] = [
 
 
 # ============================================================
-# ADD MARKET SCORES
+# 10. ADD POISSON SCORES
+# ============================================================
+
+backtest["poisson_rps"] = [
+    scores["rps"]
+    for scores in poisson_scores
+]
+
+backtest["poisson_log_loss"] = [
+    scores["log_loss"]
+    for scores in poisson_scores
+]
+
+backtest["poisson_brier"] = [
+    scores["brier"]
+    for scores in poisson_scores
+]
+
+
+# ============================================================
+# 11. ADD MARKET SCORES
 # ============================================================
 
 backtest["market_rps"] = [
@@ -128,7 +212,7 @@ backtest["market_brier"] = [
 
 
 # ============================================================
-# SUMMARY
+# 12. SUMMARY
 # ============================================================
 
 print(
@@ -143,6 +227,9 @@ summary_columns = [
     "elo_rps",
     "elo_log_loss",
     "elo_brier",
+    "poisson_rps",
+    "poisson_log_loss",
+    "poisson_brier",
     "market_rps",
     "market_log_loss",
     "market_brier",
@@ -156,7 +243,7 @@ print(
 
 
 # ============================================================
-# VALIDATE SCORED BACKTEST
+# 13. VALIDATE SCORED BACKTEST
 # ============================================================
 
 if backtest[
@@ -178,7 +265,7 @@ if backtest["match_id"].duplicated().any():
 
 
 # ============================================================
-# SAVE SCORED BACKTEST
+# 14. SAVE SCORED BACKTEST
 # ============================================================
 
 backtest.to_csv(
