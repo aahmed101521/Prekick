@@ -7,6 +7,7 @@ from prekick.dixon_coles import (
     dixon_coles_score_probability,
     fit_rho,
     total_dixon_coles_negative_log_likelihood,
+    unpack_dixon_coles_parameters,
 )
 from prekick.poisson import match_outcome_probabilities
 
@@ -228,3 +229,41 @@ def test_fit_rho_recovers_known_low_score_pattern():
         -0.1,
         abs=1e-3,
     )
+
+
+def test_unpack_dixon_coles_parameters():
+    parameters = [
+        0.2,
+        -0.1,
+        0.3,
+        -0.2,
+        0.1,
+        0.15,
+        -0.05,
+    ]
+
+    attacks, defences, home_advantage, rho = (
+        unpack_dixon_coles_parameters(
+            parameters,
+            number_of_teams=3,
+        )
+    )
+
+    assert attacks == pytest.approx(
+        [
+            0.2,
+            -0.1,
+            -0.1,
+        ]
+    )
+
+    assert defences == pytest.approx(
+        [
+            0.3,
+            -0.2,
+            0.1,
+        ]
+    )
+
+    assert home_advantage == pytest.approx(0.15)
+    assert rho == pytest.approx(-0.05)

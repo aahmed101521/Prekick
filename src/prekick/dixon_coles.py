@@ -2,6 +2,7 @@ from math import log
 
 from scipy.optimize import minimize_scalar
 
+from prekick.goal_model import unpack_parameters
 from prekick.poisson import independent_score_probability
 
 
@@ -117,6 +118,28 @@ def total_dixon_coles_negative_log_likelihood(
         )
 
     return total_loss
+
+
+def unpack_dixon_coles_parameters(
+    parameters,
+    number_of_teams: int,
+) -> tuple[list[float], list[float], float, float]:
+    """Unpack goal-model parameters and Dixon-Coles rho."""
+
+    goal_parameters = parameters[:-1]
+    rho = float(parameters[-1])
+
+    attacks, defences, home_advantage = unpack_parameters(
+        goal_parameters,
+        number_of_teams,
+    )
+
+    return (
+        attacks,
+        defences,
+        home_advantage,
+        rho,
+    )
 
 
 def fit_rho(
