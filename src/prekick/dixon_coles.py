@@ -213,6 +213,33 @@ def dixon_coles_model_negative_log_likelihood(
     return total_loss
 
 
+def regularized_dixon_coles_model_negative_log_likelihood(
+    parameters,
+    matches: list[tuple[str, str, int, int]],
+    team_index: dict[str, int],
+    penalty_strength: float,
+) -> float:
+    """Return regularized Dixon-Coles model negative log-likelihood."""
+
+    model_loss = dixon_coles_model_negative_log_likelihood(
+        parameters,
+        matches,
+        team_index,
+    )
+
+    attacks, defences, _, _ = unpack_dixon_coles_parameters(
+        parameters,
+        len(team_index),
+    )
+
+    penalty = penalty_strength * (
+        sum(attack ** 2 for attack in attacks)
+        + sum(defence ** 2 for defence in defences)
+    )
+
+    return model_loss + penalty
+
+
 def fit_rho(
     matches: list[tuple[float, float, int, int]],
     lower_bound: float = -0.2,

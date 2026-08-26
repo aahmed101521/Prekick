@@ -7,6 +7,7 @@ from prekick.dixon_coles import (
     dixon_coles_model_negative_log_likelihood,
     dixon_coles_score_probability,
     fit_rho,
+    regularized_dixon_coles_model_negative_log_likelihood,
     total_dixon_coles_negative_log_likelihood,
     unpack_dixon_coles_parameters,
 )
@@ -300,3 +301,44 @@ def test_dixon_coles_model_negative_log_likelihood():
     )
 
     assert loss > 0
+
+
+def test_regularized_dixon_coles_model_negative_log_likelihood():
+    team_index = {
+        "Team A": 0,
+        "Team B": 1,
+    }
+
+    parameters = [
+        0.2,
+        0.1,
+        -0.1,
+        0.15,
+        -0.05,
+    ]
+
+    matches = [
+        (
+            "Team A",
+            "Team B",
+            1,
+            0,
+        ),
+    ]
+
+    unregularized_loss = dixon_coles_model_negative_log_likelihood(
+        parameters,
+        matches,
+        team_index,
+    )
+
+    regularized_loss = (
+        regularized_dixon_coles_model_negative_log_likelihood(
+            parameters,
+            matches,
+            team_index,
+            penalty_strength=1.0,
+        )
+    )
+
+    assert regularized_loss > unregularized_loss
