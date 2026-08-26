@@ -15,6 +15,10 @@ poisson = pd.read_csv(
     "predictions/poisson_backtest_predictions.csv"
 )
 
+dixon_coles = pd.read_csv(
+    "predictions/dixon_coles_backtest_predictions.csv"
+)
+
 
 # ============================================================
 # 2. MERGE POISSON PREDICTIONS
@@ -54,7 +58,45 @@ if backtest[
 
 
 # ============================================================
-# 3. DEFINE SHARED ROW-SCORING FUNCTION
+# 3. MERGE DIXON-COLES PREDICTIONS
+# ============================================================
+
+dixon_coles_columns = [
+    "match_id",
+    "dixon_coles_home_xg",
+    "dixon_coles_away_xg",
+    "dixon_coles_rho",
+    "dixon_coles_home_prob",
+    "dixon_coles_draw_prob",
+    "dixon_coles_away_prob",
+]
+
+backtest = backtest.merge(
+    dixon_coles[dixon_coles_columns],
+    on="match_id",
+    how="left",
+    validate="one_to_one",
+)
+
+if len(backtest) != 1520:
+    raise ValueError(
+        "Merged backtest does not contain the expected 1520 matches."
+    )
+
+if backtest[
+    [
+        "dixon_coles_home_prob",
+        "dixon_coles_draw_prob",
+        "dixon_coles_away_prob",
+    ]
+].isna().any().any():
+    raise ValueError(
+        "Some matches are missing Dixon-Coles predictions."
+    )
+
+
+# ============================================================
+# 4. DEFINE SHARED ROW-SCORING FUNCTION
 # ============================================================
 
 def score_row(
@@ -72,7 +114,7 @@ def score_row(
 
 
 # ============================================================
-# 4. SCORE BASE-RATE PREDICTIONS
+# 5. SCORE BASE-RATE PREDICTIONS
 # ============================================================
 
 base_rate_scores = backtest.apply(
@@ -87,7 +129,7 @@ base_rate_scores = backtest.apply(
 
 
 # ============================================================
-# 5. SCORE ELO PREDICTIONS
+# 6. SCORE ELO PREDICTIONS
 # ============================================================
 
 elo_scores = backtest.apply(
@@ -102,7 +144,7 @@ elo_scores = backtest.apply(
 
 
 # ============================================================
-# 6. SCORE POISSON PREDICTIONS
+# 7. SCORE POISSON PREDICTIONS
 # ============================================================
 
 poisson_scores = backtest.apply(
@@ -117,7 +159,22 @@ poisson_scores = backtest.apply(
 
 
 # ============================================================
-# 7. SCORE MARKET PREDICTIONS
+# 8. SCORE DIXON-COLES PREDICTIONS
+# ============================================================
+
+dixon_coles_scores = backtest.apply(
+    lambda row: score_row(
+        row,
+        "dixon_coles_home_prob",
+        "dixon_coles_draw_prob",
+        "dixon_coles_away_prob",
+    ),
+    axis=1,
+)
+
+
+# ============================================================
+# 9. SCORE MARKET PREDICTIONS
 # ============================================================
 
 market_scores = backtest.apply(
@@ -132,7 +189,7 @@ market_scores = backtest.apply(
 
 
 # ============================================================
-# 8. ADD BASE-RATE SCORES
+# 10. ADD BASE-RATE SCORES
 # ============================================================
 
 backtest["base_rate_rps"] = [
@@ -152,7 +209,7 @@ backtest["base_rate_brier"] = [
 
 
 # ============================================================
-# 9. ADD ELO SCORES
+# 11. ADD ELO SCORES
 # ============================================================
 
 backtest["elo_rps"] = [
@@ -172,7 +229,7 @@ backtest["elo_brier"] = [
 
 
 # ============================================================
-# 10. ADD POISSON SCORES
+# 12. ADD POISSON SCORES
 # ============================================================
 
 backtest["poisson_rps"] = [
@@ -192,7 +249,27 @@ backtest["poisson_brier"] = [
 
 
 # ============================================================
-# 11. ADD MARKET SCORES
+# 13. ADD DIXON-COLES SCORES
+# ============================================================
+
+backtest["dixon_coles_rps"] = [
+    scores["rps"]
+    for scores in dixon_coles_scores
+]
+
+backtest["dixon_coles_log_loss"] = [
+    scores["log_loss"]
+    for scores in dixon_coles_scores
+]
+
+backtest["dixon_coles_brier"] = [
+    scores["brier"]
+    for scores in dixon_coles_scores
+]
+
+
+# ============================================================
+# 14. ADD MARKET SCORES
 # ============================================================
 
 backtest["market_rps"] = [
@@ -212,7 +289,7 @@ backtest["market_brier"] = [
 
 
 # ============================================================
-# 12. SUMMARY
+# 15. SUMMARY
 # ============================================================
 
 print(
@@ -230,6 +307,9 @@ summary_columns = [
     "poisson_rps",
     "poisson_log_loss",
     "poisson_brier",
+    "dixon_coles_rps",
+    "dixon_coles_log_loss",
+    "dixon_coles_brier",
     "market_rps",
     "market_log_loss",
     "market_brier",
@@ -243,7 +323,7 @@ print(
 
 
 # ============================================================
-# 13. VALIDATE SCORED BACKTEST
+# 16. VALIDATE SCORED BACKTEST
 # ============================================================
 
 if backtest[
@@ -265,7 +345,7 @@ if backtest["match_id"].duplicated().any():
 
 
 # ============================================================
-# 14. SAVE SCORED BACKTEST
+# 17. SAVE SCORED BACKTEST
 # ============================================================
 
 backtest.to_csv(
