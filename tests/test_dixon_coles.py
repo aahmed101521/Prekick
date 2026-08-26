@@ -2,9 +2,10 @@ import pytest
 
 from prekick.dixon_coles import (
     dixon_coles_correction,
+    dixon_coles_match_negative_log_likelihood,
     dixon_coles_match_outcome_probabilities,
     dixon_coles_score_probability,
-    dixon_coles_match_negative_log_likelihood,
+    total_dixon_coles_negative_log_likelihood,
 )
 from prekick.poisson import match_outcome_probabilities
 
@@ -167,3 +168,46 @@ def test_dixon_coles_match_negative_log_likelihood_rejects_invalid_probability()
             away_goals=0,
             rho=0.1,
         )
+
+
+def test_total_dixon_coles_negative_log_likelihood():
+    matches = [
+        (
+            1.5,
+            0.8,
+            0,
+            0,
+        ),
+        (
+            1.2,
+            1.0,
+            1,
+            1,
+        ),
+    ]
+
+    total_loss = total_dixon_coles_negative_log_likelihood(
+        matches,
+        rho=-0.1,
+    )
+
+    expected_loss = (
+        dixon_coles_match_negative_log_likelihood(
+            home_expected_goals=1.5,
+            away_expected_goals=0.8,
+            home_goals=0,
+            away_goals=0,
+            rho=-0.1,
+        )
+        + dixon_coles_match_negative_log_likelihood(
+            home_expected_goals=1.2,
+            away_expected_goals=1.0,
+            home_goals=1,
+            away_goals=1,
+            rho=-0.1,
+        )
+    )
+
+    assert total_loss == pytest.approx(
+        expected_loss
+    )

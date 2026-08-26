@@ -92,6 +92,31 @@ def dixon_coles_match_negative_log_likelihood(
     return -log(probability)
 
 
+def total_dixon_coles_negative_log_likelihood(
+    matches: list[tuple[float, float, int, int]],
+    rho: float,
+) -> float:
+    """Return total Dixon-Coles negative log-likelihood across matches."""
+
+    total_loss = 0.0
+
+    for (
+        home_expected_goals,
+        away_expected_goals,
+        home_goals,
+        away_goals,
+    ) in matches:
+        total_loss += dixon_coles_match_negative_log_likelihood(
+            home_expected_goals=home_expected_goals,
+            away_expected_goals=away_expected_goals,
+            home_goals=home_goals,
+            away_goals=away_goals,
+            rho=rho,
+        )
+
+    return total_loss
+
+
 def dixon_coles_match_outcome_probabilities(
     home_expected_goals: float,
     away_expected_goals: float,
