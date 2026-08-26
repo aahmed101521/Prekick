@@ -2,7 +2,10 @@ from math import log
 
 from scipy.optimize import minimize_scalar
 
-from prekick.goal_model import unpack_parameters
+from prekick.goal_model import (
+    expected_goals,
+    unpack_parameters,
+)
 from prekick.poisson import independent_score_probability
 
 
@@ -140,6 +143,74 @@ def unpack_dixon_coles_parameters(
         home_advantage,
         rho,
     )
+
+
+def dixon_coles_model_negative_log_likelihood(
+    parameters,
+    matches: list[tuple[str, str, int, int]],
+    team_index: dict[str, int],
+) -> float:
+    """Return Dixon-Coles negative log-likelihood for model parameters."""
+
+    (
+        attacks,
+        defences,
+        home_advantage,
+        rho,
+    ) = unpack_dixon_coles_parameters(
+        parameters,
+        len(team_index),
+    )
+
+    total_loss = 0.0
+
+    for (
+        home_team,
+        away_team,
+        home_goals,
+        away_goals,
+    ) in matches:
+        home_attack = attacks[
+            team_index[home_team]
+        ]
+        home_defence = defences[
+            team_index[home_team]
+        ]
+
+        away_attack = attacks[
+            team_index[away_team]
+        ]
+        away_defence = defences[
+            team_index[away_team]
+        ]
+
+        (
+            home_expected_goals,
+            away_expected_goals,
+        ) = expected_goals(
+            home_attack,
+            home_defence,
+            away_attack,
+            away_defence,
+            home_advantage,
+        )
+
+        try:
+            match_loss = (
+                dixon_coles_match_negative_log_likelihood(
+                    home_expected_goals=home_expected_goals,
+                    away_expected_goals=away_expected_goals,
+                    home_goals=home_goals,
+                    away_goals=away_goals,
+                    rho=rho,
+                )
+            )
+        except ValueError:
+            return float("inf")
+
+        total_loss += match_loss
+
+    return total_loss
 
 
 def fit_rho(

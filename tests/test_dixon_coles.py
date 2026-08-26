@@ -4,6 +4,7 @@ from prekick.dixon_coles import (
     dixon_coles_correction,
     dixon_coles_match_negative_log_likelihood,
     dixon_coles_match_outcome_probabilities,
+    dixon_coles_model_negative_log_likelihood,
     dixon_coles_score_probability,
     fit_rho,
     total_dixon_coles_negative_log_likelihood,
@@ -267,3 +268,35 @@ def test_unpack_dixon_coles_parameters():
 
     assert home_advantage == pytest.approx(0.15)
     assert rho == pytest.approx(-0.05)
+
+
+def test_dixon_coles_model_negative_log_likelihood():
+    team_index = {
+        "Team A": 0,
+        "Team B": 1,
+    }
+
+    parameters = [
+        0.2,
+        0.1,
+        -0.1,
+        0.15,
+        -0.05,
+    ]
+
+    matches = [
+        (
+            "Team A",
+            "Team B",
+            1,
+            0,
+        ),
+    ]
+
+    loss = dixon_coles_model_negative_log_likelihood(
+        parameters,
+        matches,
+        team_index,
+    )
+
+    assert loss > 0
