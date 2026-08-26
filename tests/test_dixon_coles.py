@@ -5,6 +5,7 @@ from prekick.dixon_coles import (
     dixon_coles_match_negative_log_likelihood,
     dixon_coles_match_outcome_probabilities,
     dixon_coles_score_probability,
+    fit_rho,
     total_dixon_coles_negative_log_likelihood,
 )
 from prekick.poisson import match_outcome_probabilities
@@ -210,4 +211,20 @@ def test_total_dixon_coles_negative_log_likelihood():
 
     assert total_loss == pytest.approx(
         expected_loss
+    )
+
+
+def test_fit_rho_recovers_known_low_score_pattern():
+    matches = (
+        [(1.0, 1.0, 0, 0)] * 6
+        + [(1.0, 1.0, 1, 1)] * 5
+        + [(1.0, 1.0, 0, 1)] * 5
+        + [(1.0, 1.0, 1, 0)] * 4
+    )
+
+    rho = fit_rho(matches)
+
+    assert rho == pytest.approx(
+        -0.1,
+        abs=1e-3,
     )

@@ -1,5 +1,7 @@
 from math import log
 
+from scipy.optimize import minimize_scalar
+
 from prekick.poisson import independent_score_probability
 
 
@@ -115,6 +117,39 @@ def total_dixon_coles_negative_log_likelihood(
         )
 
     return total_loss
+
+
+def fit_rho(
+    matches: list[tuple[float, float, int, int]],
+    lower_bound: float = -0.2,
+    upper_bound: float = 0.2,
+) -> float:
+    """Fit the Dixon-Coles rho parameter for fixed expected goals."""
+
+    def objective(rho: float) -> float:
+        try:
+            return total_dixon_coles_negative_log_likelihood(
+                matches,
+                rho,
+            )
+        except ValueError:
+            return float("inf")
+
+    result = minimize_scalar(
+        objective,
+        bounds=(
+            lower_bound,
+            upper_bound,
+        ),
+        method="bounded",
+    )
+
+    if not result.success:
+        raise RuntimeError(
+            f"Dixon-Coles rho optimization failed: {result.message}"
+        )
+
+    return float(result.x)
 
 
 def dixon_coles_match_outcome_probabilities(
