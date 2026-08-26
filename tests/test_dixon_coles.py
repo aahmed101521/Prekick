@@ -4,6 +4,7 @@ from prekick.dixon_coles import (
     dixon_coles_correction,
     dixon_coles_match_outcome_probabilities,
     dixon_coles_score_probability,
+    dixon_coles_match_negative_log_likelihood,
 )
 from prekick.poisson import match_outcome_probabilities
 
@@ -143,3 +144,26 @@ def test_negative_rho_increases_draw_probability():
         dixon_coles_probabilities[1]
         > independent_probabilities[1]
     )
+
+
+def test_dixon_coles_match_negative_log_likelihood():
+    loss = dixon_coles_match_negative_log_likelihood(
+        home_expected_goals=1.5,
+        away_expected_goals=0.8,
+        home_goals=0,
+        away_goals=0,
+        rho=-0.1,
+    )
+
+    assert loss > 0
+
+
+def test_dixon_coles_match_negative_log_likelihood_rejects_invalid_probability():
+    with pytest.raises(ValueError):
+        dixon_coles_match_negative_log_likelihood(
+            home_expected_goals=10.0,
+            away_expected_goals=10.0,
+            home_goals=0,
+            away_goals=0,
+            rho=0.1,
+        )

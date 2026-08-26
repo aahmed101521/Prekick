@@ -1,3 +1,5 @@
+from math import log
+
 from prekick.poisson import independent_score_probability
 
 
@@ -63,6 +65,31 @@ def dixon_coles_score_probability(
     )
 
     return independent_probability * correction
+
+
+def dixon_coles_match_negative_log_likelihood(
+    home_expected_goals: float,
+    away_expected_goals: float,
+    home_goals: int,
+    away_goals: int,
+    rho: float,
+) -> float:
+    """Return the Dixon-Coles negative log-likelihood of a scoreline."""
+
+    probability = dixon_coles_score_probability(
+        home_expected_goals,
+        away_expected_goals,
+        home_goals,
+        away_goals,
+        rho,
+    )
+
+    if probability <= 0:
+        raise ValueError(
+            "Dixon-Coles scoreline probability must be positive."
+        )
+
+    return -log(probability)
 
 
 def dixon_coles_match_outcome_probabilities(
