@@ -1,5 +1,6 @@
 import pandas as pd
 
+from prekick.ensemble import blend_probabilities
 from prekick.scoring import score_prediction
 
 
@@ -96,7 +97,35 @@ if backtest[
 
 
 # ============================================================
-# 4. DEFINE SHARED ROW-SCORING FUNCTION
+# 4. CREATE 50/50 ELO + POISSON ENSEMBLE
+# ============================================================
+
+ensemble_probabilities = backtest.apply(
+    lambda row: blend_probabilities(
+        first_probabilities=(
+            row["elo_home_prob"],
+            row["elo_draw_prob"],
+            row["elo_away_prob"],
+        ),
+        second_probabilities=(
+            row["poisson_home_prob"],
+            row["poisson_draw_prob"],
+            row["poisson_away_prob"],
+        ),
+        first_weight=0.5,
+    ),
+    axis=1,
+)
+
+(
+    backtest["ensemble_home_prob"],
+    backtest["ensemble_draw_prob"],
+    backtest["ensemble_away_prob"],
+) = zip(*ensemble_probabilities)
+
+
+# ============================================================
+# 5. DEFINE SHARED ROW-SCORING FUNCTION
 # ============================================================
 
 def score_row(
@@ -114,7 +143,7 @@ def score_row(
 
 
 # ============================================================
-# 5. SCORE BASE-RATE PREDICTIONS
+# 6. SCORE BASE-RATE PREDICTIONS
 # ============================================================
 
 base_rate_scores = backtest.apply(
@@ -129,7 +158,7 @@ base_rate_scores = backtest.apply(
 
 
 # ============================================================
-# 6. SCORE ELO PREDICTIONS
+# 7. SCORE ELO PREDICTIONS
 # ============================================================
 
 elo_scores = backtest.apply(
@@ -144,7 +173,7 @@ elo_scores = backtest.apply(
 
 
 # ============================================================
-# 7. SCORE POISSON PREDICTIONS
+# 8. SCORE POISSON PREDICTIONS
 # ============================================================
 
 poisson_scores = backtest.apply(
@@ -159,7 +188,7 @@ poisson_scores = backtest.apply(
 
 
 # ============================================================
-# 8. SCORE DIXON-COLES PREDICTIONS
+# 9. SCORE DIXON-COLES PREDICTIONS
 # ============================================================
 
 dixon_coles_scores = backtest.apply(
@@ -174,7 +203,22 @@ dixon_coles_scores = backtest.apply(
 
 
 # ============================================================
-# 9. SCORE MARKET PREDICTIONS
+# 10. SCORE 50/50 ELO + POISSON ENSEMBLE
+# ============================================================
+
+ensemble_scores = backtest.apply(
+    lambda row: score_row(
+        row,
+        "ensemble_home_prob",
+        "ensemble_draw_prob",
+        "ensemble_away_prob",
+    ),
+    axis=1,
+)
+
+
+# ============================================================
+# 11. SCORE MARKET PREDICTIONS
 # ============================================================
 
 market_scores = backtest.apply(
@@ -189,7 +233,7 @@ market_scores = backtest.apply(
 
 
 # ============================================================
-# 10. ADD BASE-RATE SCORES
+# 12. ADD BASE-RATE SCORES
 # ============================================================
 
 backtest["base_rate_rps"] = [
@@ -209,7 +253,7 @@ backtest["base_rate_brier"] = [
 
 
 # ============================================================
-# 11. ADD ELO SCORES
+# 13. ADD ELO SCORES
 # ============================================================
 
 backtest["elo_rps"] = [
@@ -229,7 +273,7 @@ backtest["elo_brier"] = [
 
 
 # ============================================================
-# 12. ADD POISSON SCORES
+# 14. ADD POISSON SCORES
 # ============================================================
 
 backtest["poisson_rps"] = [
@@ -249,7 +293,7 @@ backtest["poisson_brier"] = [
 
 
 # ============================================================
-# 13. ADD DIXON-COLES SCORES
+# 15. ADD DIXON-COLES SCORES
 # ============================================================
 
 backtest["dixon_coles_rps"] = [
@@ -269,7 +313,27 @@ backtest["dixon_coles_brier"] = [
 
 
 # ============================================================
-# 14. ADD MARKET SCORES
+# 16. ADD ENSEMBLE SCORES
+# ============================================================
+
+backtest["ensemble_rps"] = [
+    scores["rps"]
+    for scores in ensemble_scores
+]
+
+backtest["ensemble_log_loss"] = [
+    scores["log_loss"]
+    for scores in ensemble_scores
+]
+
+backtest["ensemble_brier"] = [
+    scores["brier"]
+    for scores in ensemble_scores
+]
+
+
+# ============================================================
+# 17. ADD MARKET SCORES
 # ============================================================
 
 backtest["market_rps"] = [
@@ -289,7 +353,7 @@ backtest["market_brier"] = [
 
 
 # ============================================================
-# 15. SUMMARY
+# 18. SUMMARY
 # ============================================================
 
 print(
@@ -310,6 +374,9 @@ summary_columns = [
     "dixon_coles_rps",
     "dixon_coles_log_loss",
     "dixon_coles_brier",
+    "ensemble_rps",
+    "ensemble_log_loss",
+    "ensemble_brier",
     "market_rps",
     "market_log_loss",
     "market_brier",
@@ -323,7 +390,7 @@ print(
 
 
 # ============================================================
-# 16. VALIDATE SCORED BACKTEST
+# 19. VALIDATE SCORED BACKTEST
 # ============================================================
 
 if backtest[
@@ -345,7 +412,47 @@ if backtest["match_id"].duplicated().any():
 
 
 # ============================================================
-# 17. SAVE SCORED BACKTEST
+# 20. VALIDATE ENSEMBLE PROBABILITIES
+# ============================================================
+
+ensemble_probability_columns = [
+    "ensemble_home_prob",
+    "ensemble_draw_prob",
+    "ensemble_away_prob",
+]
+
+if backtest[
+    ensemble_probability_columns
+].isna().any().any():
+    raise ValueError(
+        "Some ensemble probabilities are missing."
+    )
+
+if not backtest[
+    ensemble_probability_columns
+].apply(
+    lambda column: column.between(0, 1).all()
+).all():
+    raise ValueError(
+        "Some ensemble probabilities are outside 0 to 1."
+    )
+
+ensemble_probability_sum = (
+    backtest["ensemble_home_prob"]
+    + backtest["ensemble_draw_prob"]
+    + backtest["ensemble_away_prob"]
+)
+
+if (
+    ensemble_probability_sum - 1
+).abs().gt(1e-12).any():
+    raise ValueError(
+        "Some ensemble probabilities do not sum to 1."
+    )
+
+
+# ============================================================
+# 21. SAVE SCORED BACKTEST
 # ============================================================
 
 backtest.to_csv(
