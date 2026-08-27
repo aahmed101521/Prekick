@@ -1,7 +1,10 @@
 import numpy as np
 import pytest
 
-from prekick.multinomial import softmax
+from prekick.multinomial import (
+    linear_scores,
+    softmax,
+)
 
 
 def test_softmax_probabilities_sum_to_one():
@@ -71,3 +74,42 @@ def test_softmax_handles_large_scores():
     ).all()
 
     assert probabilities.sum() == pytest.approx(1.0)
+
+
+def test_linear_scores():
+    features = np.array(
+        [
+            2.0,
+            3.0,
+        ]
+    )
+
+    coefficients = np.array(
+        [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 1.0],
+        ]
+    )
+
+    intercepts = np.array(
+        [
+            0.5,
+            -0.5,
+            1.0,
+        ]
+    )
+
+    scores = linear_scores(
+        features,
+        coefficients,
+        intercepts,
+    )
+
+    assert scores == pytest.approx(
+        [
+            2.5,
+            2.5,
+            6.0,
+        ]
+    )
