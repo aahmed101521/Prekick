@@ -41,3 +41,19 @@ def linear_scores(
     )
 
     return coefficients @ features + intercepts
+
+
+def predict_probabilities(
+    features: np.ndarray,
+    coefficients: np.ndarray,
+    intercepts: np.ndarray,
+) -> np.ndarray:
+    """Return Home, Draw, and Away probabilities."""
+
+    scores = linear_scores(
+        features,
+        coefficients,
+        intercepts,
+    )
+
+    return softmax(scores)

@@ -3,6 +3,7 @@ import pytest
 
 from prekick.multinomial import (
     linear_scores,
+    predict_probabilities,
     softmax,
 )
 
@@ -113,3 +114,44 @@ def test_linear_scores():
             6.0,
         ]
     )
+
+
+def test_predict_probabilities():
+    features = np.array(
+        [
+            2.0,
+            3.0,
+        ]
+    )
+
+    coefficients = np.array(
+        [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 1.0],
+        ]
+    )
+
+    intercepts = np.array(
+        [
+            0.5,
+            -0.5,
+            1.0,
+        ]
+    )
+
+    probabilities = predict_probabilities(
+        features,
+        coefficients,
+        intercepts,
+    )
+
+    assert probabilities.sum() == pytest.approx(1.0)
+
+    assert (
+        (probabilities > 0)
+        & (probabilities < 1)
+    ).all()
+
+    assert probabilities[2] > probabilities[0]
+    assert probabilities[2] > probabilities[1]
