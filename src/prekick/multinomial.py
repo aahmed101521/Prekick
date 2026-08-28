@@ -125,3 +125,57 @@ def total_multinomial_negative_log_likelihood(
         )
 
     return total_loss
+
+
+def unpack_multinomial_parameters(
+    parameters: np.ndarray,
+    number_of_features: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Convert optimizer parameters into H/D/A coefficients and intercepts."""
+
+    parameters = np.asarray(
+        parameters,
+        dtype=float,
+    )
+
+    expected_length = (
+        2 * number_of_features
+        + 2
+    )
+
+    if len(parameters) != expected_length:
+        raise ValueError(
+            f"Expected {expected_length} parameters, "
+            f"received {len(parameters)}."
+        )
+
+    coefficient_end = (
+        2 * number_of_features
+    )
+
+    fitted_coefficients = parameters[
+        :coefficient_end
+    ].reshape(
+        2,
+        number_of_features,
+    )
+
+    fitted_intercepts = parameters[
+        coefficient_end:
+    ]
+
+    coefficients = np.vstack(
+        [
+            fitted_coefficients,
+            np.zeros(number_of_features),
+        ]
+    )
+
+    intercepts = np.concatenate(
+        [
+            fitted_intercepts,
+            np.zeros(1),
+        ]
+    )
+
+    return coefficients, intercepts

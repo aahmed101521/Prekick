@@ -7,6 +7,7 @@ from prekick.multinomial import (
     predict_probabilities,
     softmax,
     total_multinomial_negative_log_likelihood,
+    unpack_multinomial_parameters,
 )
 
 
@@ -250,4 +251,46 @@ def test_total_multinomial_negative_log_likelihood():
 
     assert total_loss == pytest.approx(
         expected_loss
+    )
+
+
+def test_unpack_multinomial_parameters():
+    parameters = np.array(
+        [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            0.5,
+            -0.5,
+        ]
+    )
+
+    coefficients, intercepts = (
+        unpack_multinomial_parameters(
+            parameters,
+            number_of_features=2,
+        )
+    )
+
+    assert np.array_equal(
+        coefficients,
+        np.array(
+            [
+                [1.0, 2.0],
+                [3.0, 4.0],
+                [0.0, 0.0],
+            ]
+        ),
+    )
+
+    assert np.array_equal(
+        intercepts,
+        np.array(
+            [
+                0.5,
+                -0.5,
+                0.0,
+            ]
+        ),
     )
