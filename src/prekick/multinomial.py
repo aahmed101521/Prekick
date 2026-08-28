@@ -57,3 +57,37 @@ def predict_probabilities(
     )
 
     return softmax(scores)
+
+
+def multinomial_negative_log_likelihood(
+    features: np.ndarray,
+    coefficients: np.ndarray,
+    intercepts: np.ndarray,
+    outcome: str,
+) -> float:
+    """Return negative log-likelihood for one H/D/A outcome."""
+
+    outcome_index = {
+        "H": 0,
+        "D": 1,
+        "A": 2,
+    }
+
+    if outcome not in outcome_index:
+        raise ValueError(
+            "Outcome must be 'H', 'D', or 'A'."
+        )
+
+    probabilities = predict_probabilities(
+        features,
+        coefficients,
+        intercepts,
+    )
+
+    observed_probability = probabilities[
+        outcome_index[outcome]
+    ]
+
+    return float(
+        -np.log(observed_probability)
+    )

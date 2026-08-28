@@ -3,6 +3,7 @@ import pytest
 
 from prekick.multinomial import (
     linear_scores,
+    multinomial_negative_log_likelihood,
     predict_probabilities,
     softmax,
 )
@@ -155,3 +156,58 @@ def test_predict_probabilities():
 
     assert probabilities[2] > probabilities[0]
     assert probabilities[2] > probabilities[1]
+
+
+def test_multinomial_negative_log_likelihood():
+    features = np.array(
+        [
+            1.0,
+            2.0,
+        ]
+    )
+
+    coefficients = np.zeros(
+        (
+            3,
+            2,
+        )
+    )
+
+    intercepts = np.zeros(3)
+
+    loss = multinomial_negative_log_likelihood(
+        features,
+        coefficients,
+        intercepts,
+        outcome="H",
+    )
+
+    assert loss == pytest.approx(
+        -np.log(1 / 3)
+    )
+
+
+def test_multinomial_negative_log_likelihood_rejects_invalid_outcome():
+    features = np.array(
+        [
+            1.0,
+            2.0,
+        ]
+    )
+
+    coefficients = np.zeros(
+        (
+            3,
+            2,
+        )
+    )
+
+    intercepts = np.zeros(3)
+
+    with pytest.raises(ValueError):
+        multinomial_negative_log_likelihood(
+            features,
+            coefficients,
+            intercepts,
+            outcome="X",
+        )
