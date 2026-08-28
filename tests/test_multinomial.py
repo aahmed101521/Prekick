@@ -6,6 +6,7 @@ from prekick.multinomial import (
     multinomial_negative_log_likelihood,
     predict_probabilities,
     softmax,
+    total_multinomial_negative_log_likelihood,
 )
 
 
@@ -211,3 +212,42 @@ def test_multinomial_negative_log_likelihood_rejects_invalid_outcome():
             intercepts,
             outcome="X",
         )
+
+
+def test_total_multinomial_negative_log_likelihood():
+    features = np.array(
+        [
+            [1.0, 2.0],
+            [2.0, 1.0],
+        ]
+    )
+
+    outcomes = [
+        "H",
+        "A",
+    ]
+
+    coefficients = np.zeros(
+        (
+            3,
+            2,
+        )
+    )
+
+    intercepts = np.zeros(3)
+
+    total_loss = total_multinomial_negative_log_likelihood(
+        features,
+        outcomes,
+        coefficients,
+        intercepts,
+    )
+
+    expected_loss = (
+        -np.log(1 / 3)
+        - np.log(1 / 3)
+    )
+
+    assert total_loss == pytest.approx(
+        expected_loss
+    )

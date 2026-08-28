@@ -91,3 +91,37 @@ def multinomial_negative_log_likelihood(
     return float(
         -np.log(observed_probability)
     )
+
+
+def total_multinomial_negative_log_likelihood(
+    features: np.ndarray,
+    outcomes: list[str],
+    coefficients: np.ndarray,
+    intercepts: np.ndarray,
+) -> float:
+    """Return total multinomial negative log-likelihood."""
+
+    features = np.asarray(
+        features,
+        dtype=float,
+    )
+
+    if len(features) != len(outcomes):
+        raise ValueError(
+            "Features and outcomes must contain the same number of rows."
+        )
+
+    total_loss = 0.0
+
+    for match_features, outcome in zip(
+        features,
+        outcomes,
+    ):
+        total_loss += multinomial_negative_log_likelihood(
+            match_features,
+            coefficients,
+            intercepts,
+            outcome,
+        )
+
+    return total_loss
