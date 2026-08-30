@@ -179,3 +179,32 @@ def unpack_multinomial_parameters(
     )
 
     return coefficients, intercepts
+
+
+def multinomial_model_negative_log_likelihood(
+    parameters: np.ndarray,
+    features: np.ndarray,
+    outcomes: list[str],
+) -> float:
+    """Return multinomial model loss for optimizer parameters."""
+
+    features = np.asarray(
+        features,
+        dtype=float,
+    )
+
+    number_of_features = features.shape[1]
+
+    coefficients, intercepts = (
+        unpack_multinomial_parameters(
+            parameters,
+            number_of_features,
+        )
+    )
+
+    return total_multinomial_negative_log_likelihood(
+        features,
+        outcomes,
+        coefficients,
+        intercepts,
+    )

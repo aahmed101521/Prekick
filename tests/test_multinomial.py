@@ -3,6 +3,7 @@ import pytest
 
 from prekick.multinomial import (
     linear_scores,
+    multinomial_model_negative_log_likelihood,
     multinomial_negative_log_likelihood,
     predict_probabilities,
     softmax,
@@ -293,4 +294,35 @@ def test_unpack_multinomial_parameters():
                 0.0,
             ]
         ),
+    )
+
+
+def test_multinomial_model_negative_log_likelihood():
+    features = np.array(
+        [
+            [1.0, 2.0],
+            [2.0, 1.0],
+        ]
+    )
+
+    outcomes = [
+        "H",
+        "A",
+    ]
+
+    parameters = np.zeros(6)
+
+    loss = multinomial_model_negative_log_likelihood(
+        parameters,
+        features,
+        outcomes,
+    )
+
+    expected_loss = (
+        -np.log(1 / 3)
+        - np.log(1 / 3)
+    )
+
+    assert loss == pytest.approx(
+        expected_loss
     )
