@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 import pandas as pd
 
@@ -154,7 +156,19 @@ print(
 # 5. WALK-FORWARD MULTINOMIAL VALIDATION
 # ============================================================
 
-penalty_strength = 1.0
+if len(sys.argv) != 2:
+    raise ValueError(
+        "Provide exactly one penalty strength."
+    )
+
+penalty_strength = float(
+    sys.argv[1]
+)
+
+if penalty_strength < 0:
+    raise ValueError(
+        "Penalty strength must be non-negative."
+    )
 
 prediction_blocks = []
 
