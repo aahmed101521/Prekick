@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from prekick.multinomial import (
+    fit_multinomial_model,
     linear_scores,
     multinomial_model_negative_log_likelihood,
     multinomial_negative_log_likelihood,
@@ -378,3 +379,45 @@ def test_regularized_multinomial_model_negative_log_likelihood():
     assert regularized_loss == pytest.approx(
         base_loss + expected_penalty
     )
+
+
+def test_fit_multinomial_model():
+    features = np.array(
+        [
+            [-2.0, 0.0],
+            [-1.0, 0.0],
+            [0.0, 1.0],
+            [0.0, 2.0],
+            [1.0, 0.0],
+            [2.0, 0.0],
+        ]
+    )
+
+    outcomes = [
+        "A",
+        "A",
+        "D",
+        "D",
+        "H",
+        "H",
+    ]
+
+    coefficients, intercepts = fit_multinomial_model(
+        features,
+        outcomes,
+        penalty_strength=1.0,
+    )
+
+    assert coefficients.shape == (
+        3,
+        2,
+    )
+
+    assert intercepts.shape == (3,)
+
+    assert np.array_equal(
+        coefficients[2],
+        np.zeros(2),
+    )
+
+    assert intercepts[2] == pytest.approx(0.0)

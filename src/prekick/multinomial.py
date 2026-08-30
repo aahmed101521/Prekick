@@ -1,5 +1,7 @@
 import numpy as np
 
+from scipy.optimize import minimize
+
 
 def softmax(scores: np.ndarray) -> np.ndarray:
     """Convert model scores into probabilities that sum to one."""
@@ -245,4 +247,49 @@ def regularized_multinomial_model_negative_log_likelihood(
 
     return float(
         base_loss + penalty
+    )
+
+
+def fit_multinomial_model(
+    features: np.ndarray,
+    outcomes: list[str],
+    penalty_strength: float = 1.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Fit a regularized multinomial logistic regression model."""
+
+    features = np.asarray(
+        features,
+        dtype=float,
+    )
+
+    number_of_features = features.shape[1]
+
+    number_of_parameters = (
+        2 * number_of_features
+        + 2
+    )
+
+    initial_parameters = np.zeros(
+        number_of_parameters
+    )
+
+    result = minimize(
+        regularized_multinomial_model_negative_log_likelihood,
+        initial_parameters,
+        args=(
+            features,
+            outcomes,
+            penalty_strength,
+        ),
+        method="L-BFGS-B",
+    )
+
+    if not result.success:
+        raise RuntimeError(
+            f"Multinomial model fitting failed: {result.message}"
+        )
+
+    return unpack_multinomial_parameters(
+        result.x,
+        number_of_features,
     )
