@@ -1,7 +1,14 @@
+import numpy as np
 import pandas as pd
 
+from prekick.multinomial import (
+    fit_multinomial_model,
+    predict_probabilities,
+)
 from prekick.preprocessing import (
     build_standardization_mask,
+    fit_standardization_parameters,
+    transform_features,
 )
 
 
@@ -138,4 +145,178 @@ prediction_dates = (
 print(
     "Prediction-date blocks:",
     len(prediction_dates),
+)
+
+
+# ============================================================
+# 5. WALK-FORWARD MULTINOMIAL VALIDATION
+# ============================================================
+
+penalty_strength = 1.0
+
+prediction_blocks = []
+
+for prediction_date in prediction_dates:
+    print(
+        "Fitting validation date:",
+        prediction_date.date(),
+    )
+
+    # Strictly historical training data.
+    train_data = data[
+        data["Date"] < prediction_date
+    ].copy()
+
+    # Predict all matches on the current date together.
+    predict_data = data[
+        data["Date"] == prediction_date
+    ].copy()
+
+    # --------------------------------------------------------
+    # LEARN PREPROCESSING FROM TRAINING DATA ONLY
+    # --------------------------------------------------------
+
+    train_features_raw = train_data[
+        feature_columns
+    ].to_numpy(
+        dtype=float,
+    )
+
+    predict_features_raw = predict_data[
+        feature_columns
+    ].to_numpy(
+        dtype=float,
+    )
+
+    (
+        means,
+        standard_deviations,
+    ) = fit_standardization_parameters(
+        train_features_raw,
+        standardization_mask,
+    )
+
+    train_features = transform_features(
+        train_features_raw,
+        means,
+        standard_deviations,
+    )
+
+    predict_features = transform_features(
+        predict_features_raw,
+        means,
+        standard_deviations,
+    )
+
+    if not np.isfinite(
+        train_features
+    ).all():
+        raise ValueError(
+            "Training features contain non-finite values."
+        )
+
+    if not np.isfinite(
+        predict_features
+    ).all():
+        raise ValueError(
+            "Prediction features contain non-finite values."
+        )
+
+    # --------------------------------------------------------
+    # FIT MULTINOMIAL MODEL
+    # --------------------------------------------------------
+
+    outcomes = train_data[
+        "FTR"
+    ].tolist()
+
+    (
+        coefficients,
+        intercepts,
+    ) = fit_multinomial_model(
+        train_features,
+        outcomes,
+        penalty_strength=penalty_strength,
+    )
+
+    # --------------------------------------------------------
+    # PREDICT CURRENT DATE
+    # --------------------------------------------------------
+
+    multinomial_probabilities = [
+        predict_probabilities(
+            match_features,
+            coefficients,
+            intercepts,
+        )
+        for match_features in predict_features
+    ]
+
+    (
+        predict_data["multinomial_home_prob"],
+        predict_data["multinomial_draw_prob"],
+        predict_data["multinomial_away_prob"],
+    ) = zip(*multinomial_probabilities)
+
+    prediction_blocks.append(
+        predict_data
+    )
+
+
+# ============================================================
+# 6. COMBINE VALIDATION PREDICTIONS
+# ============================================================
+
+validation_predictions = pd.concat(
+    prediction_blocks,
+    ignore_index=True,
+)
+
+
+# ============================================================
+# 7. VALIDATE RESULTS
+# ============================================================
+
+if len(validation_predictions) != 124:
+    raise ValueError(
+        "Validation predictions do not contain the expected 124 matches."
+    )
+
+if validation_predictions[
+    "match_id"
+].duplicated().any():
+    raise ValueError(
+        "Duplicate match IDs found in validation predictions."
+    )
+
+probability_sum = (
+    validation_predictions["multinomial_home_prob"]
+    + validation_predictions["multinomial_draw_prob"]
+    + validation_predictions["multinomial_away_prob"]
+)
+
+if (
+    probability_sum - 1.0
+).abs().gt(1e-12).any():
+    raise ValueError(
+        "Some multinomial probabilities do not sum to 1."
+    )
+
+print(
+    "Completed validation predictions:",
+    len(validation_predictions),
+)
+
+print(
+    validation_predictions[
+        [
+            "Date",
+            "HomeTeam",
+            "AwayTeam",
+            "FTR",
+            "multinomial_home_prob",
+            "multinomial_draw_prob",
+            "multinomial_away_prob",
+        ]
+    ].head()
 )
