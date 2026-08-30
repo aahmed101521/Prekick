@@ -6,6 +6,7 @@ from prekick.multinomial import (
     multinomial_model_negative_log_likelihood,
     multinomial_negative_log_likelihood,
     predict_probabilities,
+    regularized_multinomial_model_negative_log_likelihood,
     softmax,
     total_multinomial_negative_log_likelihood,
     unpack_multinomial_parameters,
@@ -325,4 +326,55 @@ def test_multinomial_model_negative_log_likelihood():
 
     assert loss == pytest.approx(
         expected_loss
+    )
+
+
+def test_regularized_multinomial_model_negative_log_likelihood():
+    features = np.array(
+        [
+            [1.0, 2.0],
+            [2.0, 1.0],
+        ]
+    )
+
+    outcomes = [
+        "H",
+        "A",
+    ]
+
+    parameters = np.array(
+        [
+            1.0,
+            2.0,
+            3.0,
+            4.0,
+            0.5,
+            -0.5,
+        ]
+    )
+
+    base_loss = multinomial_model_negative_log_likelihood(
+        parameters,
+        features,
+        outcomes,
+    )
+
+    regularized_loss = (
+        regularized_multinomial_model_negative_log_likelihood(
+            parameters,
+            features,
+            outcomes,
+            penalty_strength=1.0,
+        )
+    )
+
+    expected_penalty = (
+        1.0 ** 2
+        + 2.0 ** 2
+        + 3.0 ** 2
+        + 4.0 ** 2
+    )
+
+    assert regularized_loss == pytest.approx(
+        base_loss + expected_penalty
     )

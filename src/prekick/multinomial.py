@@ -208,3 +208,41 @@ def multinomial_model_negative_log_likelihood(
         coefficients,
         intercepts,
     )
+
+
+def regularized_multinomial_model_negative_log_likelihood(
+    parameters: np.ndarray,
+    features: np.ndarray,
+    outcomes: list[str],
+    penalty_strength: float,
+) -> float:
+    """Return multinomial loss with L2 coefficient regularization."""
+
+    features = np.asarray(
+        features,
+        dtype=float,
+    )
+
+    number_of_features = features.shape[1]
+
+    base_loss = multinomial_model_negative_log_likelihood(
+        parameters,
+        features,
+        outcomes,
+    )
+
+    coefficient_end = (
+        2 * number_of_features
+    )
+
+    coefficient_parameters = parameters[
+        :coefficient_end
+    ]
+
+    penalty = penalty_strength * np.sum(
+        coefficient_parameters ** 2
+    )
+
+    return float(
+        base_loss + penalty
+    )
