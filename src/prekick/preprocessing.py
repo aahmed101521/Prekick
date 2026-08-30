@@ -47,3 +47,46 @@ def fit_standardization_parameters(
     ] = 1.0
 
     return means, standard_deviations
+
+
+def transform_features(
+    features: np.ndarray,
+    means: np.ndarray,
+    standard_deviations: np.ndarray,
+) -> np.ndarray:
+    """Impute missing values and standardize features."""
+
+    features = np.asarray(
+        features,
+        dtype=float,
+    )
+
+    means = np.asarray(
+        means,
+        dtype=float,
+    )
+
+    standard_deviations = np.asarray(
+        standard_deviations,
+        dtype=float,
+    )
+
+    if features.shape[1] != len(means):
+        raise ValueError(
+            "Means must match the number of features."
+        )
+
+    if features.shape[1] != len(standard_deviations):
+        raise ValueError(
+            "Standard deviations must match the number of features."
+        )
+
+    imputed_features = np.where(
+        np.isnan(features),
+        means,
+        features,
+    )
+
+    return (
+        imputed_features - means
+    ) / standard_deviations
