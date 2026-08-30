@@ -90,3 +90,17 @@ def transform_features(
     return (
         imputed_features - means
     ) / standard_deviations
+
+
+def build_standardization_mask(
+    feature_names: list[str],
+) -> np.ndarray:
+    """Return True for continuous lag features and False for history indicators."""
+
+    return np.array(
+        [
+            "has_lag_" not in feature_name
+            for feature_name in feature_names
+        ],
+        dtype=bool,
+    )

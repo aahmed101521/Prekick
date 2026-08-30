@@ -1,6 +1,7 @@
 import numpy as np
 
 from prekick.preprocessing import (
+    build_standardization_mask,
     fit_standardization_parameters,
     transform_features,
 )
@@ -95,4 +96,31 @@ def test_transform_features():
     assert np.allclose(
         transformed,
         expected,
+    )
+
+
+def test_build_standardization_mask():
+    feature_names = [
+        "home_goals_for_lag_1",
+        "home_shots_for_lag_2",
+        "home_has_lag_1_history",
+        "away_goals_against_lag_1",
+        "away_has_lag_2_history",
+    ]
+
+    mask = build_standardization_mask(
+        feature_names
+    )
+
+    assert np.array_equal(
+        mask,
+        np.array(
+            [
+                True,
+                True,
+                False,
+                True,
+                False,
+            ]
+        ),
     )
