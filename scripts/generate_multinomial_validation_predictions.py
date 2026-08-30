@@ -11,6 +11,8 @@ from prekick.preprocessing import (
     transform_features,
 )
 
+from prekick.scoring import score_prediction
+
 
 # ============================================================
 # 1. LOAD DATA
@@ -319,4 +321,42 @@ print(
             "multinomial_away_prob",
         ]
     ].head()
+)
+
+
+# ============================================================
+# 8. SCORE VALIDATION PREDICTIONS
+# ============================================================
+
+validation_scores = pd.DataFrame(
+    [
+        score_prediction(
+            row.multinomial_home_prob,
+            row.multinomial_draw_prob,
+            row.multinomial_away_prob,
+            row.FTR,
+        )
+        for row in validation_predictions.itertuples()
+    ]
+)
+
+print()
+print(
+    "Penalty strength:",
+    penalty_strength,
+)
+
+print(
+    "Mean validation RPS:",
+    validation_scores["rps"].mean(),
+)
+
+print(
+    "Mean validation log loss:",
+    validation_scores["log_loss"].mean(),
+)
+
+print(
+    "Mean validation Brier:",
+    validation_scores["brier"].mean(),
 )
