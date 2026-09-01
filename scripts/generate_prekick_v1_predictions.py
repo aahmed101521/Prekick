@@ -398,3 +398,278 @@ print(
     sum(poisson_defences)
     / len(poisson_defences),
 )
+
+
+# ============================================================
+# 6. LOAD AND VALIDATE UPCOMING FIXTURES
+# ============================================================
+
+fixtures = pd.read_csv(
+    "data/fixtures/upcoming_fixtures.csv",
+)
+
+expected_fixture_columns = [
+    "fixture_id",
+    "season",
+    "matchweek",
+    "kickoff_utc",
+    "home_team",
+    "away_team",
+]
+
+if list(fixtures.columns) != expected_fixture_columns:
+    raise ValueError(
+        "Upcoming fixture columns do not match the expected schema."
+    )
+
+if len(fixtures) != 10:
+    raise ValueError(
+        "Expected exactly 10 upcoming fixtures."
+    )
+
+if fixtures["fixture_id"].duplicated().any():
+    raise ValueError(
+        "Duplicate fixture IDs found."
+    )
+
+known_live_teams = set(
+    live_training_data["HomeTeam"]
+) | set(
+    live_training_data["AwayTeam"]
+)
+
+fixture_teams = set(
+    fixtures["home_team"]
+) | set(
+    fixtures["away_team"]
+)
+
+unknown_fixture_teams = sorted(
+    fixture_teams - known_live_teams
+)
+
+print()
+print(
+    "Upcoming fixtures:",
+    len(fixtures),
+)
+
+print(
+    "Unknown fixture teams:",
+    unknown_fixture_teams,
+)
+
+print()
+print(
+    fixtures[
+        [
+            "kickoff_utc",
+            "home_team",
+            "away_team",
+        ]
+    ].to_string(
+        index=False,
+    )
+)
+
+
+# ============================================================
+# 7. GENERATE ELO, POISSON, AND PREKICK PREDICTIONS
+# ============================================================
+
+prediction_rows = []
+
+for fixture in fixtures.itertuples():
+    # --------------------------------------------------------
+    # ELO
+    # --------------------------------------------------------
+
+    home_elo = elo_ratings.get(
+        fixture.home_team,
+        INITIAL_ELO_RATING,
+    )
+
+    away_elo = elo_ratings.get(
+        fixture.away_team,
+        INITIAL_ELO_RATING,
+    )
+
+    (
+        elo_home_prob,
+        elo_draw_prob,
+        elo_away_prob,
+    ) = three_way_probabilities(
+        home_elo,
+        away_elo,
+        elo_draw_parameter,
+        home_advantage=ELO_HOME_ADVANTAGE,
+    )
+
+    # --------------------------------------------------------
+    # POISSON
+    # --------------------------------------------------------
+
+    (
+        home_attack,
+        home_defence,
+    ) = get_team_parameters(
+        fixture.home_team,
+        poisson_team_index,
+        poisson_attacks,
+        poisson_defences,
+    )
+
+    (
+        away_attack,
+        away_defence,
+    ) = get_team_parameters(
+        fixture.away_team,
+        poisson_team_index,
+        poisson_attacks,
+        poisson_defences,
+    )
+
+    (
+        poisson_home_xg,
+        poisson_away_xg,
+    ) = expected_goals(
+        home_attack=home_attack,
+        home_defence=home_defence,
+        away_attack=away_attack,
+        away_defence=away_defence,
+        home_advantage=poisson_home_advantage,
+    )
+
+    (
+        poisson_home_prob,
+        poisson_draw_prob,
+        poisson_away_prob,
+    ) = match_outcome_probabilities(
+        poisson_home_xg,
+        poisson_away_xg,
+    )
+
+    # --------------------------------------------------------
+    # 50/50 PREKICK V1 ENSEMBLE
+    # --------------------------------------------------------
+
+    p_home = (
+        ELO_WEIGHT * elo_home_prob
+        + POISSON_WEIGHT * poisson_home_prob
+    )
+
+    p_draw = (
+        ELO_WEIGHT * elo_draw_prob
+        + POISSON_WEIGHT * poisson_draw_prob
+    )
+
+    p_away = (
+        ELO_WEIGHT * elo_away_prob
+        + POISSON_WEIGHT * poisson_away_prob
+    )
+
+    prediction_rows.append(
+        {
+            "fixture_id": fixture.fixture_id,
+            "season": fixture.season,
+            "matchweek": fixture.matchweek,
+            "kickoff_utc": fixture.kickoff_utc,
+            "home_team": fixture.home_team,
+            "away_team": fixture.away_team,
+            "home_elo": home_elo,
+            "away_elo": away_elo,
+            "elo_home_prob": elo_home_prob,
+            "elo_draw_prob": elo_draw_prob,
+            "elo_away_prob": elo_away_prob,
+            "poisson_home_xg": poisson_home_xg,
+            "poisson_away_xg": poisson_away_xg,
+            "poisson_home_prob": poisson_home_prob,
+            "poisson_draw_prob": poisson_draw_prob,
+            "poisson_away_prob": poisson_away_prob,
+            "p_home": p_home,
+            "p_draw": p_draw,
+            "p_away": p_away,
+        }
+    )
+
+
+predictions = pd.DataFrame(
+    prediction_rows
+)
+
+
+# ============================================================
+# 8. VALIDATE PREKICK PREDICTIONS
+# ============================================================
+
+if len(predictions) != 10:
+    raise ValueError(
+        "Expected exactly 10 Prekick predictions."
+    )
+
+if predictions["fixture_id"].duplicated().any():
+    raise ValueError(
+        "Duplicate fixture IDs found in Prekick predictions."
+    )
+
+probability_columns = [
+    "p_home",
+    "p_draw",
+    "p_away",
+]
+
+if not predictions[
+    probability_columns
+].apply(
+    lambda column: column.between(0, 1).all()
+).all():
+    raise ValueError(
+        "Some Prekick probabilities are outside 0 to 1."
+    )
+
+probability_sum = (
+    predictions["p_home"]
+    + predictions["p_draw"]
+    + predictions["p_away"]
+)
+
+if (
+    probability_sum - 1.0
+).abs().gt(1e-12).any():
+    raise ValueError(
+        "Some Prekick probabilities do not sum to 1."
+    )
+
+
+# ============================================================
+# 9. DISPLAY PREKICK PREDICTIONS
+# ============================================================
+
+print()
+print(
+    "Prekick v1 predictions:",
+    len(predictions),
+)
+
+print()
+print(
+    predictions[
+        [
+            "home_team",
+            "away_team",
+            "poisson_home_xg",
+            "poisson_away_xg",
+            "elo_home_prob",
+            "elo_draw_prob",
+            "elo_away_prob",
+            "poisson_home_prob",
+            "poisson_draw_prob",
+            "poisson_away_prob",
+            "p_home",
+            "p_draw",
+            "p_away",
+        ]
+    ].to_string(
+        index=False,
+    )
+)
