@@ -52,13 +52,116 @@ print(
 )
 
 print(
-    "Training cutoff:",
+    "Historical training cutoff:",
     historical_data["Date"].max(),
 )
 
 
 # ============================================================
-# 2. RECONSTRUCT CURRENT ELO STATE
+# 2. ADD COMPLETED CURRENT-SEASON MATCHES
+# ============================================================
+
+current_season_data = pd.read_csv(
+    "data/fixtures/completed_matches_2026_27.csv",
+    parse_dates=["date"],
+)
+
+if len(current_season_data) != 20:
+    raise ValueError(
+        "Expected exactly 20 completed 2026/27 matches."
+    )
+
+current_season_data = current_season_data.rename(
+    columns={
+        "date": "Date",
+        "home_team": "HomeTeam",
+        "away_team": "AwayTeam",
+        "home_goals": "FTHG",
+        "away_goals": "FTAG",
+        "result": "FTR",
+    }
+)
+
+if not current_season_data["FTR"].isin(
+    ["H", "D", "A"]
+).all():
+    raise ValueError(
+        "Current-season results must be H, D, or A."
+    )
+
+next_match_id = (
+    int(historical_data["match_id"].max())
+    + 1
+)
+
+current_season_data["match_id"] = range(
+    next_match_id,
+    next_match_id + len(current_season_data),
+)
+
+current_season_model_data = current_season_data[
+    [
+        "match_id",
+        "Date",
+        "HomeTeam",
+        "AwayTeam",
+        "FTHG",
+        "FTAG",
+        "FTR",
+    ]
+].copy()
+
+live_training_data = pd.concat(
+    [
+        historical_data[
+            [
+                "match_id",
+                "Date",
+                "HomeTeam",
+                "AwayTeam",
+                "FTHG",
+                "FTAG",
+                "FTR",
+            ]
+        ],
+        current_season_model_data,
+    ],
+    ignore_index=True,
+)
+
+live_training_data = live_training_data.sort_values(
+    ["Date", "match_id"]
+).reset_index(drop=True)
+
+if len(live_training_data) != 1920:
+    raise ValueError(
+        "Expected exactly 1920 live training matches."
+    )
+
+if live_training_data["match_id"].duplicated().any():
+    raise ValueError(
+        "Duplicate match IDs found in live training data."
+    )
+
+print()
+print(
+    "Current-season completed matches:",
+    len(current_season_data),
+)
+
+print(
+    "Live training matches:",
+    len(live_training_data),
+)
+
+print(
+    "Live training cutoff:",
+    live_training_data["Date"].max(),
+)
+
+
+# ============================================================
+# 3. RECONSTRUCT CURRENT ELO STATE
 # ============================================================
 
 elo_ratings = {}
@@ -67,7 +170,7 @@ historical_home_elos = []
 historical_away_elos = []
 historical_results = []
 
-for match in historical_data.itertuples():
+for match in live_training_data.itertuples():
     home_rating = elo_ratings.get(
         match.HomeTeam,
         INITIAL_ELO_RATING,
@@ -78,8 +181,7 @@ for match in historical_data.itertuples():
         INITIAL_ELO_RATING,
     )
 
-    # Store the ratings as they stood BEFORE this match.
-    # These are required for fitting the Elo draw parameter.
+    # Store ratings as they stood BEFORE the match.
     historical_home_elos.append(
         home_rating
     )
@@ -109,8 +211,8 @@ for match in historical_data.itertuples():
     )
 
 
-# Fit the draw parameter using the complete historical
-# training period and the corresponding pre-match ratings.
+# Fit the draw parameter using every match available
+# before the upcoming fixtures.
 elo_draw_parameter = fit_draw_parameter(
     historical_home_elos,
     historical_away_elos,
@@ -119,7 +221,7 @@ elo_draw_parameter = fit_draw_parameter(
 )
 
 
-# Elo updates conserve the total number of rating points.
+# Elo updates conserve the total rating points.
 expected_rating_total = (
     len(elo_ratings)
     * INITIAL_ELO_RATING
@@ -136,7 +238,6 @@ if abs(
     raise ValueError(
         "Elo rating points were not conserved."
     )
-
 
 print()
 print(
@@ -156,7 +257,7 @@ print(
 
 
 # ============================================================
-# 3. VERIFY ELO RECONSTRUCTION
+# 4. VERIFY HISTORICAL ELO RECONSTRUCTION
 # ============================================================
 
 elo_history = pd.read_csv(
@@ -166,8 +267,16 @@ elo_history = pd.read_csv(
 reconstructed_elo_history = pd.DataFrame(
     {
         "match_id": historical_data["match_id"],
-        "reconstructed_home_elo": historical_home_elos,
-        "reconstructed_away_elo": historical_away_elos,
+        "reconstructed_home_elo": (
+            historical_home_elos[
+                :len(historical_data)
+            ]
+        ),
+        "reconstructed_away_elo": (
+            historical_away_elos[
+                :len(historical_data)
+            ]
+        ),
     }
 )
 
@@ -222,16 +331,16 @@ print(
 
 
 # ============================================================
-# 4. FIT CURRENT POISSON STATE
+# 5. FIT CURRENT POISSON STATE
 # ============================================================
 
 poisson_teams = sorted(
-    set(historical_data["HomeTeam"])
-    | set(historical_data["AwayTeam"])
+    set(live_training_data["HomeTeam"])
+    | set(live_training_data["AwayTeam"])
 )
 
 poisson_matches = list(
-    historical_data[
+    live_training_data[
         [
             "HomeTeam",
             "AwayTeam",
