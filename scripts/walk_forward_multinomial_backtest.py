@@ -1,7 +1,14 @@
+import numpy as np
 import pandas as pd
 
+from prekick.multinomial import (
+    fit_multinomial_model,
+    predict_probabilities,
+)
 from prekick.preprocessing import (
     build_standardization_mask,
+    fit_standardization_parameters,
+    transform_features,
 )
 
 
@@ -114,4 +121,177 @@ print(
 print(
     "Last backtest date:",
     backtest_data["Date"].max(),
+)
+
+
+# ============================================================
+# 5. WALK-FORWARD MULTINOMIAL BACKTEST
+# ============================================================
+
+prediction_blocks = []
+
+for prediction_date in prediction_dates:
+    print(
+        "Fitting backtest date:",
+        prediction_date.date(),
+    )
+
+    # Strictly historical training data.
+    train_data = data[
+        data["Date"] < prediction_date
+    ].copy()
+
+    # Predict every match on the current date together.
+    predict_data = data[
+        data["Date"] == prediction_date
+    ].copy()
+
+    # --------------------------------------------------------
+    # LEARN PREPROCESSING FROM TRAINING DATA ONLY
+    # --------------------------------------------------------
+
+    train_features_raw = train_data[
+        feature_columns
+    ].to_numpy(
+        dtype=float,
+    )
+
+    predict_features_raw = predict_data[
+        feature_columns
+    ].to_numpy(
+        dtype=float,
+    )
+
+    (
+        means,
+        standard_deviations,
+    ) = fit_standardization_parameters(
+        train_features_raw,
+        standardization_mask,
+    )
+
+    train_features = transform_features(
+        train_features_raw,
+        means,
+        standard_deviations,
+    )
+
+    predict_features = transform_features(
+        predict_features_raw,
+        means,
+        standard_deviations,
+    )
+
+    if not np.isfinite(
+        train_features
+    ).all():
+        raise ValueError(
+            "Training features contain non-finite values."
+        )
+
+    if not np.isfinite(
+        predict_features
+    ).all():
+        raise ValueError(
+            "Prediction features contain non-finite values."
+        )
+
+    # --------------------------------------------------------
+    # FIT MULTINOMIAL MODEL
+    # --------------------------------------------------------
+
+    outcomes = train_data[
+        "FTR"
+    ].tolist()
+
+    (
+        coefficients,
+        intercepts,
+    ) = fit_multinomial_model(
+        train_features,
+        outcomes,
+        penalty_strength=penalty_strength,
+    )
+
+    # --------------------------------------------------------
+    # PREDICT CURRENT DATE
+    # --------------------------------------------------------
+
+    multinomial_probabilities = [
+        predict_probabilities(
+            match_features,
+            coefficients,
+            intercepts,
+        )
+        for match_features in predict_features
+    ]
+
+    (
+        predict_data["multinomial_home_prob"],
+        predict_data["multinomial_draw_prob"],
+        predict_data["multinomial_away_prob"],
+    ) = zip(*multinomial_probabilities)
+
+    prediction_blocks.append(
+        predict_data
+    )
+
+
+# ============================================================
+# 6. COMBINE BACKTEST PREDICTIONS
+# ============================================================
+
+backtest_predictions = pd.concat(
+    prediction_blocks,
+    ignore_index=True,
+)
+
+
+# ============================================================
+# 7. VALIDATE BACKTEST PREDICTIONS
+# ============================================================
+
+if len(backtest_predictions) != 1520:
+    raise ValueError(
+        "Backtest predictions do not contain the expected 1520 matches."
+    )
+
+if backtest_predictions[
+    "match_id"
+].duplicated().any():
+    raise ValueError(
+        "Duplicate match IDs found in multinomial backtest."
+    )
+
+probability_sum = (
+    backtest_predictions["multinomial_home_prob"]
+    + backtest_predictions["multinomial_draw_prob"]
+    + backtest_predictions["multinomial_away_prob"]
+)
+
+if (
+    probability_sum - 1.0
+).abs().gt(1e-12).any():
+    raise ValueError(
+        "Some multinomial probabilities do not sum to 1."
+    )
+
+print()
+print(
+    "Completed backtest predictions:",
+    len(backtest_predictions),
+)
+
+print(
+    backtest_predictions[
+        [
+            "Date",
+            "HomeTeam",
+            "AwayTeam",
+            "FTR",
+            "multinomial_home_prob",
+            "multinomial_draw_prob",
+            "multinomial_away_prob",
+        ]
+    ].head()
 )
