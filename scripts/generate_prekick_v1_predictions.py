@@ -153,3 +153,139 @@ print(
     "Fitted Elo draw parameter:",
     elo_draw_parameter,
 )
+
+
+# ============================================================
+# 3. VERIFY ELO RECONSTRUCTION
+# ============================================================
+
+elo_history = pd.read_csv(
+    "data/processed/elo_history.csv",
+)
+
+reconstructed_elo_history = pd.DataFrame(
+    {
+        "match_id": historical_data["match_id"],
+        "reconstructed_home_elo": historical_home_elos,
+        "reconstructed_away_elo": historical_away_elos,
+    }
+)
+
+elo_check = elo_history[
+    [
+        "match_id",
+        "home_elo_before",
+        "away_elo_before",
+    ]
+].merge(
+    reconstructed_elo_history,
+    on="match_id",
+    how="inner",
+    validate="one_to_one",
+)
+
+if len(elo_check) != len(historical_data):
+    raise ValueError(
+        "Elo verification did not match every historical fixture."
+    )
+
+home_difference = (
+    elo_check["home_elo_before"]
+    - elo_check["reconstructed_home_elo"]
+).abs()
+
+away_difference = (
+    elo_check["away_elo_before"]
+    - elo_check["reconstructed_away_elo"]
+).abs()
+
+maximum_elo_difference = max(
+    home_difference.max(),
+    away_difference.max(),
+)
+
+if maximum_elo_difference > 1e-9:
+    raise ValueError(
+        "Live Elo reconstruction does not match Elo history."
+    )
+
+print()
+print(
+    "Elo history rows verified:",
+    len(elo_check),
+)
+
+print(
+    "Maximum Elo reconstruction difference:",
+    maximum_elo_difference,
+)
+
+
+# ============================================================
+# 4. FIT CURRENT POISSON STATE
+# ============================================================
+
+poisson_teams = sorted(
+    set(historical_data["HomeTeam"])
+    | set(historical_data["AwayTeam"])
+)
+
+poisson_matches = list(
+    historical_data[
+        [
+            "HomeTeam",
+            "AwayTeam",
+            "FTHG",
+            "FTAG",
+        ]
+    ].itertuples(
+        index=False,
+        name=None,
+    )
+)
+
+(
+    poisson_attacks,
+    poisson_defences,
+    poisson_home_advantage,
+) = fit_goal_model(
+    poisson_matches,
+    poisson_teams,
+)
+
+poisson_team_index = build_team_index(
+    poisson_teams
+)
+
+if len(poisson_attacks) != len(poisson_teams):
+    raise ValueError(
+        "Poisson attack parameters do not match team count."
+    )
+
+if len(poisson_defences) != len(poisson_teams):
+    raise ValueError(
+        "Poisson defence parameters do not match team count."
+    )
+
+print()
+print(
+    "Poisson teams fitted:",
+    len(poisson_teams),
+)
+
+print(
+    "Poisson home advantage:",
+    poisson_home_advantage,
+)
+
+print(
+    "Mean Poisson attack:",
+    sum(poisson_attacks)
+    / len(poisson_attacks),
+)
+
+print(
+    "Mean Poisson defence:",
+    sum(poisson_defences)
+    / len(poisson_defences),
+)
