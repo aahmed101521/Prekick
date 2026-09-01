@@ -673,3 +673,170 @@ print(
         index=False,
     )
 )
+
+
+# ============================================================
+# 10. PREPARE LEDGER ROWS
+# ============================================================
+
+ledger_path = "predictions/ledger.csv"
+
+expected_ledger_columns = [
+    "fixture_id",
+    "season",
+    "matchweek",
+    "kickoff_utc",
+    "home_team",
+    "away_team",
+    "model_version",
+    "training_cutoff_utc",
+    "predicted_at_utc",
+    "p_home",
+    "p_draw",
+    "p_away",
+    "home_goals",
+    "away_goals",
+    "result",
+    "rps",
+    "log_loss",
+    "brier",
+]
+
+ledger = pd.read_csv(
+    ledger_path,
+    dtype=str,
+    keep_default_na=False,
+)
+
+if list(ledger.columns) != expected_ledger_columns:
+    raise ValueError(
+        "Ledger columns do not match the expected schema."
+    )
+
+existing_fixture_ids = set(
+    ledger["fixture_id"]
+)
+
+duplicate_fixture_ids = sorted(
+    set(predictions["fixture_id"])
+    & existing_fixture_ids
+)
+
+if duplicate_fixture_ids:
+    raise ValueError(
+        "These fixture IDs already exist in the ledger: "
+        + ", ".join(duplicate_fixture_ids)
+    )
+
+training_cutoff_utc = (
+    live_training_data["Date"].max()
+    .strftime("%Y-%m-%dT23:59:59Z")
+)
+
+predicted_at_utc = (
+    datetime.now(timezone.utc)
+    .replace(microsecond=0)
+    .isoformat()
+    .replace("+00:00", "Z")
+)
+
+ledger_rows = predictions[
+    [
+        "fixture_id",
+        "season",
+        "matchweek",
+        "kickoff_utc",
+        "home_team",
+        "away_team",
+        "p_home",
+        "p_draw",
+        "p_away",
+    ]
+].copy()
+
+ledger_rows["model_version"] = (
+    MODEL_VERSION
+)
+
+ledger_rows["training_cutoff_utc"] = (
+    training_cutoff_utc
+)
+
+ledger_rows["predicted_at_utc"] = (
+    predicted_at_utc
+)
+
+ledger_rows["home_goals"] = ""
+ledger_rows["away_goals"] = ""
+ledger_rows["result"] = ""
+ledger_rows["rps"] = ""
+ledger_rows["log_loss"] = ""
+ledger_rows["brier"] = ""
+
+ledger_rows = ledger_rows[
+    expected_ledger_columns
+]
+
+if len(ledger_rows) != len(predictions):
+    raise ValueError(
+        "Ledger row count does not match prediction count."
+    )
+
+if ledger_rows["fixture_id"].duplicated().any():
+    raise ValueError(
+        "Duplicate fixture IDs found in ledger rows."
+    )
+
+
+# ============================================================
+# 11. DISPLAY CANDIDATE LEDGER ROWS
+# ============================================================
+
+print()
+print(
+    "Candidate ledger rows:",
+    len(ledger_rows),
+)
+
+print()
+print(
+    ledger_rows.to_string(
+        index=False,
+    )
+)
+
+
+# ============================================================
+# 12. APPEND PREKICK V1 PREDICTIONS TO LEDGER
+# ============================================================
+
+updated_ledger = pd.concat(
+    [
+        ledger,
+        ledger_rows,
+    ],
+    ignore_index=True,
+)
+
+if len(updated_ledger) != (
+    len(ledger) + len(ledger_rows)
+):
+    raise ValueError(
+        "Unexpected ledger row count after append."
+    )
+
+updated_ledger.to_csv(
+    ledger_path,
+    index=False,
+)
+
+print()
+print(
+    "Prekick v1 rows appended:",
+    len(ledger_rows),
+)
+
+print(
+    "Total ledger rows:",
+    len(updated_ledger),
+)
