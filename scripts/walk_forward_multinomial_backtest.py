@@ -11,6 +11,7 @@ from prekick.preprocessing import (
     transform_features,
 )
 
+from prekick.scoring import score_prediction
 
 # ============================================================
 # 1. LOAD DATA
@@ -294,4 +295,37 @@ print(
             "multinomial_away_prob",
         ]
     ].head()
+)
+
+
+# ============================================================
+# 8. SCORE HELD-OUT BACKTEST
+# ============================================================
+
+backtest_scores = pd.DataFrame(
+    [
+        score_prediction(
+            row.multinomial_home_prob,
+            row.multinomial_draw_prob,
+            row.multinomial_away_prob,
+            row.FTR,
+        )
+        for row in backtest_predictions.itertuples()
+    ]
+)
+
+print()
+print(
+    "Multinomial held-out RPS:",
+    backtest_scores["rps"].mean(),
+)
+
+print(
+    "Multinomial held-out log loss:",
+    backtest_scores["log_loss"].mean(),
+)
+
+print(
+    "Multinomial held-out Brier:",
+    backtest_scores["brier"].mean(),
 )
