@@ -66,10 +66,6 @@ current_season_data = pd.read_csv(
     parse_dates=["date"],
 )
 
-if len(current_season_data) != 20:
-    raise ValueError(
-        "Expected exactly 20 completed 2026/27 matches."
-    )
 
 current_season_data = current_season_data.rename(
     columns={
@@ -133,10 +129,17 @@ live_training_data = live_training_data.sort_values(
     ["Date", "match_id"]
 ).reset_index(drop=True)
 
-if len(live_training_data) != 1920:
+expected_live_training_matches = (
+    len(historical_data)
+    + len(current_season_model_data)
+)
+
+if len(live_training_data) != expected_live_training_matches:
     raise ValueError(
-        "Expected exactly 1920 live training matches."
+        "Live training row count does not equal "
+        "historical plus current-season matches."
     )
+
 
 if live_training_data["match_id"].duplicated().any():
     raise ValueError(
@@ -422,9 +425,9 @@ if list(fixtures.columns) != expected_fixture_columns:
         "Upcoming fixture columns do not match the expected schema."
     )
 
-if len(fixtures) != 10:
+if fixtures.empty:
     raise ValueError(
-        "Expected exactly 10 upcoming fixtures."
+        "No upcoming fixtures found."
     )
 
 if fixtures["fixture_id"].duplicated().any():
@@ -602,9 +605,9 @@ predictions = pd.DataFrame(
 # 8. VALIDATE PREKICK PREDICTIONS
 # ============================================================
 
-if len(predictions) != 10:
+if len(predictions) != len(fixtures):
     raise ValueError(
-        "Expected exactly 10 Prekick predictions."
+        "Prediction row count does not match fixture count."
     )
 
 if predictions["fixture_id"].duplicated().any():
