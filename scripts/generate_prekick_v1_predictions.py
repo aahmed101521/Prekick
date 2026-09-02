@@ -13,6 +13,12 @@ from prekick.goal_model import (
     fit_goal_model,
     get_team_parameters,
 )
+from prekick.live import (
+    reject_duplicate_fixture_ids,
+    validate_fixture_count,
+    validate_live_training_count,
+    validate_prediction_count,
+)
 from prekick.poisson import (
     match_outcome_probabilities,
 )
@@ -65,7 +71,6 @@ current_season_data = pd.read_csv(
     "data/fixtures/completed_matches_2026_27.csv",
     parse_dates=["date"],
 )
-
 
 current_season_data = current_season_data.rename(
     columns={
@@ -129,17 +134,15 @@ live_training_data = live_training_data.sort_values(
     ["Date", "match_id"]
 ).reset_index(drop=True)
 
-expected_live_training_matches = (
-    len(historical_data)
-    + len(current_season_model_data)
+validate_live_training_count(
+    historical_count=len(historical_data),
+    current_season_count=len(
+        current_season_model_data
+    ),
+    live_training_count=len(
+        live_training_data
+    ),
 )
-
-if len(live_training_data) != expected_live_training_matches:
-    raise ValueError(
-        "Live training row count does not equal "
-        "historical plus current-season matches."
-    )
-
 
 if live_training_data["match_id"].duplicated().any():
     raise ValueError(
@@ -425,10 +428,9 @@ if list(fixtures.columns) != expected_fixture_columns:
         "Upcoming fixture columns do not match the expected schema."
     )
 
-if fixtures.empty:
-    raise ValueError(
-        "No upcoming fixtures found."
-    )
+validate_fixture_count(
+    fixture_count=len(fixtures),
+)
 
 if fixtures["fixture_id"].duplicated().any():
     raise ValueError(
@@ -605,10 +607,10 @@ predictions = pd.DataFrame(
 # 8. VALIDATE PREKICK PREDICTIONS
 # ============================================================
 
-if len(predictions) != len(fixtures):
-    raise ValueError(
-        "Prediction row count does not match fixture count."
-    )
+validate_prediction_count(
+    prediction_count=len(predictions),
+    fixture_count=len(fixtures),
+)
 
 if predictions["fixture_id"].duplicated().any():
     raise ValueError(
@@ -716,20 +718,14 @@ if list(ledger.columns) != expected_ledger_columns:
         "Ledger columns do not match the expected schema."
     )
 
-existing_fixture_ids = set(
-    ledger["fixture_id"]
+reject_duplicate_fixture_ids(
+    prediction_fixture_ids=predictions[
+        "fixture_id"
+    ],
+    existing_fixture_ids=ledger[
+        "fixture_id"
+    ],
 )
-
-duplicate_fixture_ids = sorted(
-    set(predictions["fixture_id"])
-    & existing_fixture_ids
-)
-
-if duplicate_fixture_ids:
-    raise ValueError(
-        "These fixture IDs already exist in the ledger: "
-        + ", ".join(duplicate_fixture_ids)
-    )
 
 training_cutoff_utc = (
     live_training_data["Date"].max()
