@@ -295,7 +295,7 @@ Their errors are therefore not identical.
 A simple equal-weight ensemble:
 
 ```text
-P(Prekick) = 0.50 Ã— P(Elo) + 0.50 Ã— P(Poisson)
+P(Prekick) = 0.50 × P(Elo) + 0.50 × P(Poisson)
 ```
 
 performed better on the held-out period than either component model individually.
@@ -408,6 +408,8 @@ Results and scoring metrics are added later without replacing the original proba
 ## Current live predictions
 
 The first official `prekick_v1` predictions have been recorded for Matchweek 3 of the 2026/27 season.
+
+Matchweek 2 was not forecast because `prekick_v1` had not yet been finalized. This gap is retained intentionally rather than backfilled, so that the live ledger contains only forecasts that were genuinely recorded before kickoff.
 
 | Fixture                    |  Home |  Draw |  Away |
 | -------------------------- | ----: | ----: | ----: |
