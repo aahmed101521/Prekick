@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from prekick.live import (
+    classify_fixture_batch,
     find_duplicate_fixture_ids,
     reconcile_completed_results,
     reject_duplicate_fixture_ids,
@@ -369,4 +370,61 @@ def test_reconcile_completed_results_preserves_predictions():
         immutable_columns
     ].equals(
         immutable_before
+    )
+
+
+def test_classify_fixture_batch_empty():
+    assert (
+        classify_fixture_batch(
+            upcoming_fixture_ids=[],
+            ledger_fixture_ids=[],
+        )
+        == "empty"
+    )
+
+
+def test_classify_fixture_batch_new():
+    assert (
+        classify_fixture_batch(
+            upcoming_fixture_ids=[
+                "fixture_1",
+                "fixture_2",
+            ],
+            ledger_fixture_ids=[
+                "fixture_old",
+            ],
+        )
+        == "new"
+    )
+
+
+def test_classify_fixture_batch_predicted():
+    assert (
+        classify_fixture_batch(
+            upcoming_fixture_ids=[
+                "fixture_1",
+                "fixture_2",
+            ],
+            ledger_fixture_ids=[
+                "fixture_1",
+                "fixture_2",
+                "fixture_old",
+            ],
+        )
+        == "predicted"
+    )
+
+
+def test_classify_fixture_batch_mixed():
+    assert (
+        classify_fixture_batch(
+            upcoming_fixture_ids=[
+                "fixture_1",
+                "fixture_2",
+            ],
+            ledger_fixture_ids=[
+                "fixture_1",
+            ],
+        )
+        == "mixed"
     )

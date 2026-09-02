@@ -766,5 +766,3 @@ def build_live_data(
     )
 
     return completed, upcoming
-
-

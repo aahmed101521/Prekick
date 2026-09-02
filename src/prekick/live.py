@@ -618,3 +618,37 @@ def test_reconcile_completed_results_preserves_predictions():
     ].equals(
         immutable_before
     )
+
+
+def classify_fixture_batch(
+    upcoming_fixture_ids,
+    ledger_fixture_ids,
+):
+    upcoming_fixture_ids = set(
+        upcoming_fixture_ids
+    )
+
+    ledger_fixture_ids = set(
+        ledger_fixture_ids
+    )
+
+    existing_fixture_ids = (
+        upcoming_fixture_ids
+        & ledger_fixture_ids
+    )
+
+    new_fixture_ids = (
+        upcoming_fixture_ids
+        - ledger_fixture_ids
+    )
+
+    if not upcoming_fixture_ids:
+        return "empty"
+
+    if not existing_fixture_ids:
+        return "new"
+
+    if not new_fixture_ids:
+        return "predicted"
+
+    return "mixed"
