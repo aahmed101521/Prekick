@@ -478,10 +478,10 @@ pytest
 Current status:
 
 ```text
-82 passed
+91 passed
 ```
 
-The tests cover the core statistical components including:
+The tests cover the core statistical and production components including:
 
 * Elo;
 * Poisson probabilities;
@@ -490,7 +490,10 @@ The tests cover the core statistical components including:
 * ensembles;
 * multinomial modelling;
 * preprocessing;
-* probabilistic scoring.
+* probabilistic scoring;
+* live training-count validation;
+* fixture and prediction-count validation;
+* live-ledger duplicate protection.
 
 ---
 
@@ -502,23 +505,149 @@ Current Prekick v1 predictions are generated with:
 python scripts\generate_prekick_v1_predictions.py
 ```
 
-The script currently:
+The script:
 
 1. loads the frozen historical data;
-2. adds completed current-season results;
+2. adds all completed current-season results available before the prediction batch;
 3. reconstructs the current Elo state;
-4. verifies the historical Elo reconstruction;
-5. fits the current Poisson model;
-6. loads upcoming fixtures;
-7. generates Elo probabilities;
-8. generates Poisson probabilities;
-9. combines them using the fixed 50/50 ensemble;
-10. validates all probability outputs;
-11. prepares ledger rows;
-12. checks for duplicate fixture IDs;
-13. appends valid new predictions to the live ledger.
+4. verifies the historical Elo reconstruction against the stored Elo history;
+5. fits the current Independent Poisson model;
+6. loads and validates the upcoming fixtures;
+7. identifies any previously unseen teams;
+8. generates Elo probabilities;
+9. generates Poisson probabilities;
+10. combines them using the fixed 50/50 Prekick v1 ensemble;
+11. validates the prediction count and probability outputs;
+12. prepares immutable prediction-ledger rows;
+13. checks whether any fixture IDs already exist in the ledger;
+14. appends only valid new prediction rows.
 
-The live workflow is still being refactored so that match and fixture counts are fully dynamic between matchweeks.
+Match and fixture counts are dynamic. The script therefore does not assume a fixed number of completed matches or upcoming fixtures for a matchweek.
+
+A repeated attempt to generate predictions for fixture IDs that are already present in the ledger is rejected. This prevents an official prediction from being silently overwritten or regenerated after it has already been recorded.
+
+---
+
+## Weekly production workflow
+
+The live workflow is designed to keep prospective predictions separate from later match outcomes.
+
+For each new Premier League prediction batch:
+
+### 1. Update completed matches
+
+Add newly completed 2026/27 Premier League matches to:
+
+```text
+data/fixtures/completed_matches_2026_27.csv
+```
+
+Only matches that were completed before the upcoming prediction batch should be included.
+
+The completed-match data become part of the training history used to reconstruct the current Elo state and refit the Poisson model.
+
+### 2. Update upcoming fixtures
+
+Replace the contents of:
+
+```text
+data/fixtures/upcoming_fixtures.csv
+```
+
+with the fixtures that should receive the next official Prekick v1 predictions.
+
+Each fixture must have a unique `fixture_id`.
+
+### 3. Generate official predictions
+
+Run:
+
+```powershell
+python scripts\generate_prekick_v1_predictions.py
+```
+
+The script fits the live Elo and Poisson states using all permitted completed matches, generates the fixed Prekick v1 probabilities, validates them, and records them in:
+
+```text
+predictions/ledger.csv
+```
+
+Once a fixture has been recorded in the ledger, rerunning the generator with the same fixture ID is rejected.
+
+### 4. Preserve the prediction record
+
+The following ledger fields represent the original prospective forecast and should remain unchanged after prediction time:
+
+```text
+fixture_id
+season
+matchweek
+kickoff_utc
+home_team
+away_team
+model_version
+training_cutoff_utc
+predicted_at_utc
+p_home
+p_draw
+p_away
+```
+
+Match outcomes and evaluation metrics are added only after the relevant matches have been completed.
+
+### 5. Add completed outcomes to the ledger
+
+After the fixtures are completed, populate the corresponding result fields in the ledger:
+
+```text
+home_goals
+away_goals
+result
+```
+
+where `result` is:
+
+```text
+H
+D
+A
+```
+
+for home win, draw, or away win.
+
+The original probability and prediction metadata must not be changed.
+
+### 6. Score completed predictions
+
+Run:
+
+```powershell
+python scripts\score_live_ledger.py
+```
+
+The scoring script calculates:
+
+```text
+RPS
+Log Loss
+Brier Score
+```
+
+for completed predictions while verifying that the immutable prediction fields have not been altered.
+
+### 7. Run the test suite
+
+Before committing a weekly update, run:
+
+```powershell
+pytest
+```
+
+All tests should pass before the update is committed.
+
+### 8. Commit the weekly checkpoint
+
+The updated data, predictions, results, and scores can then be committed as a new reproducible project checkpoint.
 
 ---
 
@@ -540,13 +669,15 @@ Brier Score
 
 while checking that the original prediction fields have not been modified.
 
+This makes the live ledger a prospective evaluation record rather than a retrospectively reconstructed prediction table.
+
 ---
 
 ## Current project status
 
-Prekick v1 is functionally complete as a forecasting model.
+Prekick v1 is complete as a first production forecasting system.
 
-The major statistical modelling decisions are frozen:
+Its main statistical decisions are frozen:
 
 ```text
 Model:          50% Elo + 50% Independent Poisson
@@ -555,16 +686,17 @@ Primary metric: Ranked Probability Score
 Market data:    External benchmark only
 ```
 
-Current development is focused on making the live forecasting workflow robust and repeatable.
+The historical model-selection and held-out evaluation stages are complete. The live prediction generator uses dynamic match and fixture counts, prediction-ledger duplicate protection is implemented, and the live workflow has dedicated automated tests.
 
-Remaining work includes:
+The remaining activity is prospective operation rather than model development:
 
-* removing temporary matchweek-specific row-count assumptions;
-* making weekly live updates fully dynamic;
-* adding tests for live prediction and ledger operations;
-* documenting the weekly production workflow;
-* scoring prospective predictions as matches are completed;
-* final code cleanup and documentation.
+* add newly completed Premier League results;
+* generate each new fixture batch before kickoff;
+* preserve the original prediction probabilities;
+* score predictions after results become available;
+* monitor live performance over a growing prospective sample.
+
+Prekick v1 should not be retuned in response to individual live results. Any future model changes should be treated as a separately versioned model rather than retroactively modifying Prekick v1.
 
 ---
 
