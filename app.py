@@ -65,6 +65,59 @@ def format_timestamp(value) -> str:
     return value.strftime("%Y-%m-%d %H:%M UTC")
 
 
+def render_probability(label: str, value) -> None:
+    if pd.isna(value):
+        st.metric(label, "—")
+        st.progress(0)
+        return
+
+    st.metric(label, f"{value * 100:.1f}%")
+    st.progress(float(value))
+
+
+def render_fixture_card(row: pd.Series) -> None:
+    kickoff = row["kickoff_utc"]
+
+    if pd.isna(kickoff):
+        kickoff_text = "Kickoff time unavailable"
+    else:
+        kickoff_text = kickoff.strftime("%A %d %B · %H:%M UTC")
+
+    fixture = f"{row['home_team']} vs {row['away_team']}"
+
+    with st.container(border=True):
+        st.caption(kickoff_text)
+        st.subheader(fixture)
+
+        home_col, draw_col, away_col = st.columns(3)
+
+        with home_col:
+            render_probability("Home", row["p_home"])
+
+        with draw_col:
+            render_probability("Draw", row["p_draw"])
+
+        with away_col:
+            render_probability("Away", row["p_away"])
+
+        if all(
+            pd.notna(row[column])
+            for column in ["p_home", "p_draw", "p_away"]
+        ):
+            confidence = max(
+                row["p_home"],
+                row["p_draw"],
+                row["p_away"],
+            )
+
+            st.caption(
+                f"Most likely outcome: **{most_likely_outcome(row)}** "
+                f"· Confidence: **{confidence * 100:.1f}%**"
+            )
+        else:
+            st.caption("No prediction stored for this fixture.")
+
+
 # ---------------------------------------------------------------------
 # Load authoritative data
 # ---------------------------------------------------------------------
@@ -154,16 +207,8 @@ col4.metric(
 
 
 # ---------------------------------------------------------------------
-# Current matchweek
+# Current matchweek data
 # ---------------------------------------------------------------------
-
-st.divider()
-
-if active_matchweek is not None:
-    st.header(f"Matchweek {active_matchweek}")
-else:
-    st.header("Upcoming Fixtures")
-
 
 prediction_columns = [
     "fixture_id",
@@ -209,49 +254,83 @@ current["Confidence"] = (
 )
 
 
-st.dataframe(
-    current[
-        [
-            "Kickoff (UTC)",
-            "Fixture",
-            "Home",
-            "Draw",
-            "Away",
-            "Most likely",
-            "Confidence",
-        ]
-    ],
-    hide_index=True,
-    width="stretch",
-    column_config={
-        "Home": st.column_config.ProgressColumn(
-            "Home",
-            help="Probability of a home win",
-            format="%.1f%%",
-            min_value=0.0,
-            max_value=100.0,
-        ),
-        "Draw": st.column_config.ProgressColumn(
-            "Draw",
-            help="Probability of a draw",
-            format="%.1f%%",
-            min_value=0.0,
-            max_value=100.0,
-        ),
-        "Away": st.column_config.ProgressColumn(
-            "Away",
-            help="Probability of an away win",
-            format="%.1f%%",
-            min_value=0.0,
-            max_value=100.0,
-        ),
-        "Confidence": st.column_config.NumberColumn(
-            "Confidence",
-            help="Largest of the three outcome probabilities",
-            format="%.1f%%",
-        ),
-    },
+# ---------------------------------------------------------------------
+# Current matchweek presentation
+# ---------------------------------------------------------------------
+
+st.divider()
+
+if active_matchweek is not None:
+    st.header(f"Matchweek {active_matchweek}")
+else:
+    st.header("Upcoming Fixtures")
+
+st.caption(
+    "Official prospective forecasts stored in the Prekick prediction ledger."
 )
+
+if current.empty:
+    st.info("No upcoming fixtures are currently available.")
+else:
+    for start in range(0, len(current), 2):
+        left, right = st.columns(2)
+
+        with left:
+            render_fixture_card(current.iloc[start])
+
+        if start + 1 < len(current):
+            with right:
+                render_fixture_card(current.iloc[start + 1])
+
+
+# ---------------------------------------------------------------------
+# Detailed probability table
+# ---------------------------------------------------------------------
+
+with st.expander("Detailed probability table"):
+    st.dataframe(
+        current[
+            [
+                "Kickoff (UTC)",
+                "Fixture",
+                "Home",
+                "Draw",
+                "Away",
+                "Most likely",
+                "Confidence",
+            ]
+        ],
+        hide_index=True,
+        width="stretch",
+        column_config={
+            "Home": st.column_config.ProgressColumn(
+                "Home",
+                help="Probability of a home win",
+                format="%.1f%%",
+                min_value=0.0,
+                max_value=100.0,
+            ),
+            "Draw": st.column_config.ProgressColumn(
+                "Draw",
+                help="Probability of a draw",
+                format="%.1f%%",
+                min_value=0.0,
+                max_value=100.0,
+            ),
+            "Away": st.column_config.ProgressColumn(
+                "Away",
+                help="Probability of an away win",
+                format="%.1f%%",
+                min_value=0.0,
+                max_value=100.0,
+            ),
+            "Confidence": st.column_config.NumberColumn(
+                "Confidence",
+                help="Largest of the three outcome probabilities",
+                format="%.1f%%",
+            ),
+        },
+    )
 
 
 # ---------------------------------------------------------------------
@@ -297,6 +376,11 @@ with st.expander("Prediction details"):
 
 st.divider()
 st.header("Live Performance")
+
+st.caption(
+    "Performance is calculated only from completed forecasts already stored "
+    "in the ledger."
+)
 
 model_versions = sorted(
     ledger["model_version"]
@@ -490,7 +574,6 @@ with st.expander("System status"):
         }
     )
 
-    # Keep the mixed status values Arrow-compatible for Streamlit.
     status["Value"] = status["Value"].astype(str)
 
     st.dataframe(
