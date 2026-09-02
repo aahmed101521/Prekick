@@ -2,7 +2,9 @@ import pytest
 
 from prekick.data_sources import (
     completed_matches_dataframe,
+    completed_results_dataframe,
     normalise_team,
+    normalise_team_name,
     season_label,
     season_slug,
     upcoming_fixtures_dataframe,
@@ -235,3 +237,70 @@ def test_upcoming_fixture_id_preserves_nottingham_slug():
             "tottenham-hotspur"
         )
     )
+
+
+def test_normalise_team_name_supports_old_ledger_names():
+    assert (
+        normalise_team_name(
+            "Manchester United"
+        )
+        == "Man United"
+    )
+
+    assert (
+        normalise_team_name(
+            "Ipswich Town"
+        )
+        == "Ipswich"
+    )
+
+    assert (
+        normalise_team_name(
+            "Leeds United"
+        )
+        == "Leeds"
+    )
+
+    assert (
+        normalise_team_name(
+            "Brighton & Hove Albion"
+        )
+        == "Brighton"
+    )
+
+
+def test_completed_results_dataframe_includes_matchweek():
+    matches = [
+        {
+            "status": "FINISHED",
+            "matchday": 1,
+            "utcDate": "2026-08-21T19:00:00Z",
+            "homeTeam": {
+                "name": "Arsenal FC",
+            },
+            "awayTeam": {
+                "name": "Coventry City FC",
+            },
+            "score": {
+                "fullTime": {
+                    "home": 3,
+                    "away": 0,
+                }
+            },
+        }
+    ]
+
+    results = completed_results_dataframe(
+        matches,
+        season_start=2026,
+    )
+
+    row = results.iloc[0]
+
+    assert row["season"] == "2026_27"
+    assert row["matchweek"] == 1
+    assert row["home_team"] == "Arsenal"
+    assert row["away_team"] == "Coventry City"
+    assert row["home_goals"] == 3
+    assert row["away_goals"] == 0
+    assert row["result"] == "H"

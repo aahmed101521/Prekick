@@ -246,6 +246,17 @@ UPCOMING_COLUMNS = [
 ]
 
 
+COMPLETED_RESULT_COLUMNS = [
+    "season",
+    "matchweek",
+    "home_team",
+    "away_team",
+    "home_goals",
+    "away_goals",
+    "result",
+]
+
+
 def season_label(season_start):
     next_year = (
         season_start + 1
@@ -346,6 +357,20 @@ def _normalise_utc_timestamp(
     return timestamp.strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
+
+
+def normalise_team_name(
+    team_name,
+):
+    if team_name not in TEAM_NAME_MAP:
+        raise ValueError(
+            "Unknown team name: "
+            + str(team_name)
+        )
+
+    return TEAM_NAME_MAP[
+        team_name
+    ][0]
 
 
 def _result_from_goals(
@@ -468,6 +493,136 @@ def completed_matches_dataframe(
     ]
 
     return completed
+
+
+def completed_results_dataframe(
+    matches,
+    season_start=DEFAULT_SEASON_START,
+):
+    rows = []
+
+    for match in matches:
+        if match.get("status") != "FINISHED":
+            continue
+
+        matchday = match.get(
+            "matchday"
+        )
+
+        if matchday is None:
+            raise ValueError(
+                "Finished match has no matchday."
+            )
+
+        score = match.get(
+            "score",
+            {},
+        ).get(
+            "fullTime",
+            {},
+        )
+
+        home_goals = score.get(
+            "home"
+        )
+
+        away_goals = score.get(
+            "away"
+        )
+
+        if (
+            home_goals is None
+            or away_goals is None
+        ):
+            raise ValueError(
+                "Finished match has missing "
+                "full-time score."
+            )
+
+        (
+            home_team,
+            _,
+        ) = normalise_team(
+            match["homeTeam"]
+        )
+
+        (
+            away_team,
+            _,
+        ) = normalise_team(
+            match["awayTeam"]
+        )
+
+        rows.append(
+            {
+                "season": (
+                    season_label(
+                        season_start
+                    )
+                ),
+                "matchweek": int(
+                    matchday
+                ),
+                "home_team": (
+                    home_team
+                ),
+                "away_team": (
+                    away_team
+                ),
+                "home_goals": int(
+                    home_goals
+                ),
+                "away_goals": int(
+                    away_goals
+                ),
+                "result": (
+                    _result_from_goals(
+                        home_goals,
+                        away_goals,
+                    )
+                ),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(
+            columns=COMPLETED_RESULT_COLUMNS
+        )
+
+    results = pd.DataFrame(
+        rows
+    )
+
+    results = results.sort_values(
+        [
+            "matchweek",
+            "home_team",
+            "away_team",
+        ]
+    ).reset_index(
+        drop=True
+    )
+
+    results = results[
+        COMPLETED_RESULT_COLUMNS
+    ]
+
+    duplicated_matches = results.duplicated(
+        subset=[
+            "season",
+            "matchweek",
+            "home_team",
+            "away_team",
+        ]
+    )
+
+    if duplicated_matches.any():
+        raise ValueError(
+            "Duplicate completed matches "
+            "found in API data."
+        )
+
+    return results
 
 
 def upcoming_fixtures_dataframe(
@@ -611,3 +766,5 @@ def build_live_data(
     )
 
     return completed, upcoming
+
+
