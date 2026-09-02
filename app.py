@@ -440,6 +440,44 @@ else:
         f"{scored['brier'].mean():.4f}",
     )
 
+    chart_scored = (
+        scored
+        .dropna(subset=["rps"])
+        .sort_values(["kickoff_utc", "fixture_id"])
+        .reset_index(drop=True)
+    )
+
+    if not chart_scored.empty:
+        chart_scored["Forecast"] = range(
+            1,
+            len(chart_scored) + 1,
+        )
+
+        chart_scored["Cumulative mean RPS"] = (
+            chart_scored["rps"]
+            .expanding()
+            .mean()
+        )
+
+        st.subheader("Cumulative RPS")
+
+        st.caption(
+            "Lower is better. The line shows the cumulative mean RPS "
+            "after each completed forecast."
+        )
+
+        rps_chart = chart_scored[
+            [
+                "Forecast",
+                "Cumulative mean RPS",
+            ]
+        ].set_index("Forecast")
+
+        st.line_chart(
+            rps_chart,
+            width="stretch",
+        )
+
 
 # ---------------------------------------------------------------------
 # Completed predictions
