@@ -16,6 +16,12 @@ The current production model is:
 
 The betting market is retained as an external benchmark and is not used as an input to Prekick v1.
 
+[![Prekick Live Pipeline](https://github.com/aahmed101521/Prekick/actions/workflows/live_pipeline.yml/badge.svg)](https://github.com/aahmed101521/Prekick/actions/workflows/live_pipeline.yml)
+
+**Live dashboard:** https://prekick-epl.streamlit.app/
+
+**Repository:** https://github.com/aahmed101521/Prekick
+
 ---
 
 ## Project goals
@@ -289,7 +295,7 @@ Their errors are therefore not identical.
 A simple equal-weight ensemble:
 
 ```text
-P(Prekick) = 0.50 × P(Elo) + 0.50 × P(Poisson)
+P(Prekick) = 0.50 Ã— P(Elo) + 0.50 Ã— P(Poisson)
 ```
 
 performed better on the held-out period than either component model individually.
@@ -426,11 +432,61 @@ and were written to the live ledger before the fixtures were played.
 
 ---
 
-## Repository structure
+## Dashboard and deployment
 
-Important project locations currently include:
+Prekick has a read-only Streamlit dashboard for the current prospective forecasts and live evaluation record.
+
+The public application is available at:
 
 ```text
+https://prekick-epl.streamlit.app/
+```
+
+The dashboard reads the authoritative repository state from:
+
+```text
+predictions/ledger.csv
+data/fixtures/upcoming_fixtures.csv
+```
+
+It displays:
+
+* current-matchweek fixture forecasts;
+* P(Home), P(Draw), and P(Away);
+* most likely outcome and forecast confidence;
+* prediction timestamps and training cutoffs;
+* completed predictions and final results;
+* RPS, Log Loss, and Brier Score;
+* cumulative live RPS;
+* basic system-status information.
+
+The dashboard does not run model training and does not write to the prediction ledger. Forecast generation and result reconciliation remain separate backend operations.
+
+The application is containerized with Docker. A local image can be built and run with:
+
+```powershell
+docker build -t prekick .
+docker run --rm -p 8501:8501 prekick
+```
+
+Then open:
+
+```text
+http://localhost:8501
+```
+
+Streamlit Community Cloud is connected to the GitHub repository. Commits pushed to `main` are therefore reflected automatically in the deployed application.
+
+---
+## Repository structure
+
+Important production and modelling locations include:
+
+```text
+.github/
+    workflows/
+        live_pipeline.yml
+
 data/
     processed/
         model_data.csv
@@ -443,22 +499,32 @@ predictions/
     ledger.csv
 
 scripts/
-    build_elo_history.py
     generate_prekick_v1_predictions.py
+    reconcile_live_ledger.py
+    refresh_live_data.py
+    run_live_pipeline.py
     score_live_ledger.py
     walk_forward_poisson_backtest.py
     walk_forward_multinomial_backtest.py
 
 src/
     prekick/
+        data_sources.py
         elo.py
         goal_model.py
-        poisson.py
+        live.py
         multinomial.py
+        poisson.py
         preprocessing.py
         scoring.py
 
 tests/
+
+app.py
+Dockerfile
+.dockerignore
+requirements.txt
+pyproject.toml
 ```
 
 Additional research and backtesting scripts are retained in the repository as the project develops.
@@ -478,11 +544,12 @@ pytest
 Current status:
 
 ```text
-91 passed
+114 passed
 ```
 
-The tests cover the core statistical and production components including:
+The tests cover the statistical and production components including:
 
+* data-source normalization;
 * Elo;
 * Poisson probabilities;
 * goal-model fitting;
@@ -493,19 +560,23 @@ The tests cover the core statistical and production components including:
 * probabilistic scoring;
 * live training-count validation;
 * fixture and prediction-count validation;
-* live-ledger duplicate protection.
+* live-ledger duplicate protection;
+* result reconciliation;
+* fixture-batch classification;
+* immutable prediction protection;
+* prospective prediction timing, including rejection of forecasts at or after kickoff.
 
 ---
 
 ## Live prediction script
 
-Current Prekick v1 predictions are generated with:
+Official Prekick v1 forecasts are generated with:
 
 ```powershell
 python scripts\generate_prekick_v1_predictions.py
 ```
 
-The script:
+The generator:
 
 1. loads the frozen historical data;
 2. adds all completed current-season results available before the prediction batch;
@@ -518,136 +589,72 @@ The script:
 9. generates Poisson probabilities;
 10. combines them using the fixed 50/50 Prekick v1 ensemble;
 11. validates the prediction count and probability outputs;
-12. prepares immutable prediction-ledger rows;
-13. checks whether any fixture IDs already exist in the ledger;
-14. appends only valid new prediction rows.
+12. records a UTC prediction timestamp;
+13. verifies that every forecast is made strictly before kickoff;
+14. prepares immutable prediction-ledger rows;
+15. checks whether any fixture IDs already exist in the ledger;
+16. appends only valid new prediction rows.
 
-Match and fixture counts are dynamic. The script therefore does not assume a fixed number of completed matches or upcoming fixtures for a matchweek.
+Match and fixture counts are dynamic. The generator therefore does not assume a fixed number of completed matches or upcoming fixtures for a matchweek.
 
-A repeated attempt to generate predictions for fixture IDs that are already present in the ledger is rejected. This prevents an official prediction from being silently overwritten or regenerated after it has already been recorded.
+A repeated attempt to generate predictions for fixture IDs that already exist in the ledger is rejected. A prediction batch containing a fixture whose kickoff is at or before the prediction timestamp is also rejected.
 
 ---
 
-## Weekly production workflow
+## Automated production workflow
 
-The live workflow is designed to keep prospective predictions separate from later match outcomes.
+The live backend is orchestrated by:
 
-For each new Premier League prediction batch:
+```powershell
+python scripts\run_live_pipeline.py
+```
 
-### 1. Update completed matches
+A single run performs the following sequence:
 
-Add newly completed 2026/27 Premier League matches to:
+1. fetch current Premier League match data from `football-data.org`;
+2. update completed-match and upcoming-fixture CSV files;
+3. reconcile completed results with existing ledger rows;
+4. score completed predictions;
+5. inspect the upcoming fixture batch;
+6. generate Prekick v1 forecasts only when the full batch is new;
+7. skip generation safely when the full batch is already predicted;
+8. stop on mixed or otherwise unsafe fixture batches;
+9. preserve all existing prediction-time fields.
+
+The production workflow is also automated through:
+
+```text
+.github/workflows/live_pipeline.yml
+```
+
+GitHub Actions runs the pipeline twice daily:
+
+```text
+06:15 UTC
+18:15 UTC
+```
+
+The workflow can also be triggered manually.
+
+The API credential is supplied through the GitHub repository secret:
+
+```text
+FOOTBALL_DATA_API_KEY
+```
+
+The secret is not committed to the repository.
+
+After the pipeline runs, the complete test suite is executed. Only the authoritative live-state files are staged for an automated commit:
 
 ```text
 data/fixtures/completed_matches_2026_27.csv
-```
-
-Only matches that were completed before the upcoming prediction batch should be included.
-
-The completed-match data become part of the training history used to reconstruct the current Elo state and refit the Poisson model.
-
-### 2. Update upcoming fixtures
-
-Replace the contents of:
-
-```text
 data/fixtures/upcoming_fixtures.csv
-```
-
-with the fixtures that should receive the next official Prekick v1 predictions.
-
-Each fixture must have a unique `fixture_id`.
-
-### 3. Generate official predictions
-
-Run:
-
-```powershell
-python scripts\generate_prekick_v1_predictions.py
-```
-
-The script fits the live Elo and Poisson states using all permitted completed matches, generates the fixed Prekick v1 probabilities, validates them, and records them in:
-
-```text
 predictions/ledger.csv
 ```
 
-Once a fixture has been recorded in the ledger, rerunning the generator with the same fixture ID is rejected.
+If those files have not changed, the workflow makes no commit.
 
-### 4. Preserve the prediction record
-
-The following ledger fields represent the original prospective forecast and should remain unchanged after prediction time:
-
-```text
-fixture_id
-season
-matchweek
-kickoff_utc
-home_team
-away_team
-model_version
-training_cutoff_utc
-predicted_at_utc
-p_home
-p_draw
-p_away
-```
-
-Match outcomes and evaluation metrics are added only after the relevant matches have been completed.
-
-### 5. Add completed outcomes to the ledger
-
-After the fixtures are completed, populate the corresponding result fields in the ledger:
-
-```text
-home_goals
-away_goals
-result
-```
-
-where `result` is:
-
-```text
-H
-D
-A
-```
-
-for home win, draw, or away win.
-
-The original probability and prediction metadata must not be changed.
-
-### 6. Score completed predictions
-
-Run:
-
-```powershell
-python scripts\score_live_ledger.py
-```
-
-The scoring script calculates:
-
-```text
-RPS
-Log Loss
-Brier Score
-```
-
-for completed predictions while verifying that the immutable prediction fields have not been altered.
-
-### 7. Run the test suite
-
-Before committing a weekly update, run:
-
-```powershell
-pytest
-```
-
-All tests should pass before the update is committed.
-
-### 8. Commit the weekly checkpoint
-
-The updated data, predictions, results, and scores can then be committed as a new reproducible project checkpoint.
+Because Streamlit Community Cloud monitors the GitHub repository, successful live-data commits to `main` propagate automatically to the deployed dashboard.
 
 ---
 
@@ -675,9 +682,9 @@ This makes the live ledger a prospective evaluation record rather than a retrosp
 
 ## Current project status
 
-Prekick v1 is complete as a first production forecasting system.
+Prekick v1 is operational as a first production forecasting system.
 
-Its main statistical decisions are frozen:
+Its principal statistical decisions remain frozen:
 
 ```text
 Model:          50% Elo + 50% Independent Poisson
@@ -686,27 +693,40 @@ Primary metric: Ranked Probability Score
 Market data:    External benchmark only
 ```
 
-The historical model-selection and held-out evaluation stages are complete. The live prediction generator uses dynamic match and fixture counts, prediction-ledger duplicate protection is implemented, and the live workflow has dedicated automated tests.
+The current production system includes:
 
-The remaining activity is prospective operation rather than model development:
+* leakage-safe historical backtesting;
+* a frozen versioned production model;
+* prospective prediction timestamps and training cutoffs;
+* an immutable live prediction ledger;
+* football-data.org ingestion;
+* automated fixture and result refresh;
+* result reconciliation;
+* automated RPS, Log Loss, and Brier scoring;
+* duplicate forecast protection;
+* mixed-batch protection;
+* rejection of forecasts made at or after kickoff;
+* 114 automated tests;
+* a read-only Streamlit dashboard;
+* Docker support;
+* scheduled GitHub Actions;
+* public deployment on Streamlit Community Cloud.
 
-* add newly completed Premier League results;
-* generate each new fixture batch before kickoff;
-* preserve the original prediction probabilities;
-* score predictions after results become available;
-* monitor live performance over a growing prospective sample.
-
-Prekick v1 should not be retuned in response to individual live results. Any future model changes should be treated as a separately versioned model rather than retroactively modifying Prekick v1.
+Prekick v1 should not be retuned in response to individual live results. Any future modelling change should be introduced as a separately versioned model, for example `prekick_v2`, while preserving every historical `prekick_v1` forecast.
 
 ---
 
 ## Reproducibility and modelling principles
 
-Prekick follows several rules intended to keep its evaluation credible.
+Prekick follows explicit rules intended to keep its evaluation credible.
 
 ### No future information
 
 Predictions use only information available before the relevant fixture.
+
+### Strictly pre-kickoff forecasts
+
+The production generator rejects a prediction batch if any fixture kickoff is at or before the prediction timestamp.
 
 ### No held-out retuning
 
@@ -714,7 +734,7 @@ Model choices are not changed because of performance observed on the held-out ba
 
 ### No live-result retuning
 
-Prekick v1 will not be adjusted simply because a small number of live predictions perform unusually well or poorly.
+Prekick v1 is not adjusted simply because a small number of live predictions perform unusually well or poorly.
 
 ### Market separation
 
@@ -726,7 +746,11 @@ New 2026/27 results are not inserted into the historical dataset used for the or
 
 ### Immutable live predictions
 
-Once recorded, live prediction probabilities are preserved so that subsequent evaluation reflects what was genuinely predicted before kickoff.
+Once recorded, prediction probabilities, model version, training cutoff, prediction timestamp, fixture identity, and kickoff metadata are preserved. Completed results and scoring metrics may be added later, but the original forecast is not rewritten.
+
+### Versioned future development
+
+Any future change to the production model should be released under a new model version rather than retroactively modifying `prekick_v1`.
 
 ---
 
