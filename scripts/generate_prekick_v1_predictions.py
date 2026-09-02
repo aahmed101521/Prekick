@@ -18,6 +18,7 @@ from prekick.live import (
     validate_fixture_count,
     validate_live_training_count,
     validate_prediction_count,
+    validate_prediction_timing,
 )
 from prekick.poisson import (
     match_outcome_probabilities,
@@ -737,6 +738,11 @@ predicted_at_utc = (
     .replace(microsecond=0)
     .isoformat()
     .replace("+00:00", "Z")
+)
+
+validate_prediction_timing(
+    kickoff_times=fixtures["kickoff_utc"],
+    predicted_at_utc=predicted_at_utc,
 )
 
 ledger_rows = predictions[

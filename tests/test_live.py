@@ -9,6 +9,7 @@ from prekick.live import (
     validate_fixture_count,
     validate_live_training_count,
     validate_prediction_count,
+    validate_prediction_timing,
 )
 
 
@@ -54,6 +55,42 @@ def test_validate_prediction_count_rejects_mismatch():
         validate_prediction_count(
             prediction_count=6,
             fixture_count=7,
+        )
+
+
+def test_validate_prediction_timing_accepts_future_kickoffs():
+    validate_prediction_timing(
+        kickoff_times=[
+            "2026-09-04T19:00:00Z",
+            "2026-09-05T14:00:00Z",
+        ],
+        predicted_at_utc="2026-09-02T16:00:00Z",
+    )
+
+
+def test_validate_prediction_timing_rejects_equal_kickoff():
+    with pytest.raises(
+        ValueError,
+        match="at or after fixture kickoff",
+    ):
+        validate_prediction_timing(
+            kickoff_times=[
+                "2026-09-04T19:00:00Z",
+            ],
+            predicted_at_utc="2026-09-04T19:00:00Z",
+        )
+
+
+def test_validate_prediction_timing_rejects_past_kickoff():
+    with pytest.raises(
+        ValueError,
+        match="at or after fixture kickoff",
+    ):
+        validate_prediction_timing(
+            kickoff_times=[
+                "2026-09-04T19:00:00Z",
+            ],
+            predicted_at_utc="2026-09-04T19:00:01Z",
         )
 
 

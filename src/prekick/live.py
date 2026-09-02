@@ -55,6 +55,39 @@ def validate_prediction_count(
         )
 
 
+def validate_prediction_timing(
+    kickoff_times,
+    predicted_at_utc,
+):
+    predicted_at = pd.to_datetime(
+        predicted_at_utc,
+        utc=True,
+        errors="coerce",
+    )
+
+    if pd.isna(predicted_at):
+        raise ValueError(
+            "Prediction timestamp is invalid."
+        )
+
+    parsed_kickoffs = pd.to_datetime(
+        pd.Series(kickoff_times),
+        utc=True,
+        errors="coerce",
+    )
+
+    if parsed_kickoffs.isna().any():
+        raise ValueError(
+            "Fixture kickoff timestamps are invalid."
+        )
+
+    if (parsed_kickoffs <= predicted_at).any():
+        raise ValueError(
+            "Cannot generate prospective predictions "
+            "at or after fixture kickoff."
+        )
+
+
 def find_duplicate_fixture_ids(
     prediction_fixture_ids,
     existing_fixture_ids,
