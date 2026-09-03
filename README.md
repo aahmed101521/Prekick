@@ -4,9 +4,9 @@
 
 Rather than predicting a single winner, Prekick estimates three probabilities for every fixture:
 
-* **P(Home win)**
-* **P(Draw)**
-* **P(Away win)**
+- **P(Home win)**
+- **P(Draw)**
+- **P(Away win)**
 
 The project is designed around transparent statistical modelling, leakage-safe evaluation, and reproducible live forecasting.
 
@@ -28,12 +28,12 @@ The betting market is retained as an external benchmark and is not used as an in
 
 Prekick aims to build a football forecasting system that is:
 
-* probabilistic rather than deterministic;
-* evaluated on genuinely unseen matches;
-* explicit about model-selection decisions;
-* protected against look-ahead bias;
-* simple enough to inspect and understand;
-* capable of producing and recording live predictions before matches are played.
+- probabilistic rather than deterministic;
+- evaluated on genuinely unseen matches;
+- explicit about model-selection decisions;
+- protected against look-ahead bias;
+- simple enough to inspect and understand;
+- capable of producing and recording live predictions before matches are played.
 
 The project currently focuses exclusively on the **English Premier League**.
 
@@ -99,7 +99,7 @@ This prevents results from earlier matches on a given date from leaking into pre
 
 ### Protected validation period
 
-Model-selection decisions were made using:
+Pre-held-out model-selection and hyperparameter decisions were made using:
 
 ```text
 2022-03-01 to 2022-05-22
@@ -112,9 +112,11 @@ This contains:
 42 prediction-date blocks
 ```
 
+The 25% Elo / 75% Poisson ensemble achieved the best validation RPS and was carried forward as the validation-selected ensemble specification.
+
 ### Held-out backtest period
 
-Final model evaluation uses:
+The historical held-out comparison uses:
 
 ```text
 2022-08-05 to 2026-05-24
@@ -127,7 +129,11 @@ This contains:
 460 prediction-date blocks
 ```
 
-The held-out period is not used for tuning model hyperparameters or ensemble weights.
+The held-out period was not used to fit model parameters or to search for new ensemble-weight values. The 25% Elo / 75% Poisson ensemble had already been selected using the earlier protected validation period before these held-out results were examined.
+
+After the held-out comparison was observed, the fixed 50/50 Elo-Poisson ensemble was chosen as `prekick_v1` because it had the lowest observed RPS among the non-market candidates. The 50/50 held-out score is therefore conditional on that final model-selection step and should not be interpreted as an untouched estimate of future `prekick_v1` performance.
+
+The held-out result of the validation-selected 25/75 ensemble is the clean historical out-of-sample evaluation of that preselected specification. The prospective live ledger is the untouched forward evaluation of `prekick_v1`.
 
 ---
 
@@ -203,11 +209,11 @@ The Poisson model estimates team-specific attacking and defensive strength.
 
 Expected home and away goals are calculated from:
 
-* home-team attack;
-* home-team defence;
-* away-team attack;
-* away-team defence;
-* home advantage.
+- home-team attack;
+- home-team defence;
+- away-team attack;
+- away-team defence;
+- home advantage.
 
 Independent Poisson scoreline probabilities are then aggregated into:
 
@@ -233,13 +239,13 @@ A regularized multinomial logistic model was developed using lagged team-perform
 
 The model uses 28 predictors based on recent:
 
-* goals;
-* goals conceded;
-* shots;
-* shots conceded;
-* shots on target;
-* shots on target conceded;
-* available match-history indicators.
+- goals;
+- goals conceded;
+- shots;
+- shots conceded;
+- shots on target;
+- shots on target conceded;
+- available match-history indicators.
 
 Continuous features are standardized using training-period statistics only.
 
@@ -259,12 +265,12 @@ The multinomial model improves substantially over the base-rate benchmark but do
 
 ## Model comparison
 
-Held-out results:
+Observed held-out results:
 
 | Model                                     |          RPS |     Log Loss |        Brier |
 | ----------------------------------------- | -----------: | -----------: | -----------: |
 | Market benchmark                          | **0.194797** | **0.960498** | **0.570333** |
-| **Elo + Poisson 50/50**                   | **0.202809** | **0.985390** | **0.587317** |
+| Elo + Poisson 50/50                       |     0.202809 |     0.985390 |     0.587317 |
 | Validation-selected Elo 25% / Poisson 75% |     0.203784 |     0.987844 |     0.589174 |
 | Elo                                       |     0.204406 |     0.990971 |     0.591136 |
 | Dixon-Coles                               |     0.205927 |     0.994733 |     0.593505 |
@@ -272,13 +278,48 @@ Held-out results:
 | Multinomial                               |     0.220859 |     1.043945 |     0.626485 |
 | Base rate                                 |     0.231623 |     1.068443 |     0.646272 |
 
-The strongest non-market model in the held-out backtest is the fixed 50/50 Elo-Poisson ensemble.
+The 50/50 Elo-Poisson ensemble had the lowest observed held-out RPS among the non-market candidates. That ranking alone does not establish that it is clearly better than the closest alternatives.
 
-This therefore becomes:
+### Paired prediction-date block bootstrap
 
-> **Prekick v1**
+To quantify uncertainty in the held-out RPS differences, the project uses a paired percentile block bootstrap over the 460 prediction-date blocks. Each bootstrap replicate resamples prediction-date blocks once and applies the same sampled blocks to every model in the comparison.
 
-The ensemble weight will not be retuned using held-out or live results.
+Because prediction-date blocks contain different numbers of matches, RPS values are pooled across the matches contained in the resampled blocks. The estimand therefore remains the per-match mean RPS reported in the held-out comparison table.
+
+The comparison is defined as:
+
+```text
+Delta RPS = RPS(50/50) - RPS(comparator)
+```
+
+Negative values favour the 50/50 ensemble.
+
+| Comparator                                | Delta RPS | 95% bootstrap interval |
+| ----------------------------------------- | --------: | ---------------------: |
+| Validation-selected Elo 25% / Poisson 75% | -0.000975 | [-0.002012, 0.000049]  |
+| Elo                                       | -0.001596 | [-0.003595, 0.000410]  |
+| Dixon-Coles                               | -0.003118 | [-0.005230, -0.001047] |
+| Independent Poisson                       | -0.003131 | [-0.005244, -0.001061] |
+| Market benchmark                          |  0.008013 | [0.005031, 0.011013]   |
+| Base rate                                 | -0.028814 | [-0.034629, -0.022888] |
+
+The intervals for the validation-selected 25/75 ensemble and Elo include zero. The held-out data therefore do not clearly distinguish the 50/50 ensemble from those two alternatives at the 95% interval level. This is not evidence that the models are equivalent; it means that these held-out comparisons do not establish a clear difference.
+
+The intervals remain below zero against Dixon-Coles, Independent Poisson, and the base-rate benchmark, while the interval against the market benchmark remains above zero.
+
+The bootstrap uses 20,000 replicates with fixed random seed `20260903`. The analysis can be reproduced with:
+
+```powershell
+python scripts\block_bootstrap_rps.py
+```
+
+The saved output is:
+
+```text
+results/heldout_rps_block_bootstrap.csv
+```
+
+These historical intervals are conditional on the set of models already compared on the held-out period. They do not remove the selection optimism introduced by choosing the 50/50 specification as `prekick_v1` after observing the held-out comparison.
 
 ---
 
@@ -292,17 +333,19 @@ Poisson models scoring rates through attacking and defensive parameters.
 
 Their errors are therefore not identical.
 
-A simple equal-weight ensemble:
+The production ensemble is:
 
 ```text
 P(Prekick) = 0.50 × P(Elo) + 0.50 × P(Poisson)
 ```
 
-performed better on the held-out period than either component model individually.
+During the protected validation period, the 25% Elo / 75% Poisson ensemble achieved the best validation RPS and was carried forward as the validation-selected specification.
 
-Although a 25% Elo / 75% Poisson ensemble achieved the best RPS during the earlier validation period, the fixed 50/50 model subsequently produced the strongest non-market held-out performance.
+On the later held-out period, the fixed 50/50 ensemble produced the lowest observed non-market RPS and was then chosen as `prekick_v1`. Because that production choice was made after the held-out comparison was visible, the 50/50 held-out score is selection-conditioned rather than a pristine estimate of its future performance.
 
-No weight was retuned after observing held-out results.
+The paired prediction-date block bootstrap shows that the observed RPS advantage of 50/50 over the validation-selected 25/75 ensemble is small: Delta RPS = -0.000975 with a 95% interval from -0.002012 to 0.000049. Because the interval includes zero, the historical held-out data do not clearly distinguish the two ensemble weights.
+
+`prekick_v1` is nevertheless retained unchanged as the production specification. It is now frozen, and its untouched forward performance estimate comes from the prospective live ledger rather than from reinterpreting the historical held-out ranking.
 
 ---
 
@@ -453,14 +496,14 @@ data/fixtures/upcoming_fixtures.csv
 
 It displays:
 
-* current-matchweek fixture forecasts;
-* P(Home), P(Draw), and P(Away);
-* most likely outcome and forecast confidence;
-* prediction timestamps and training cutoffs;
-* completed predictions and final results;
-* RPS, Log Loss, and Brier Score;
-* cumulative live RPS;
-* basic system-status information.
+- current-matchweek fixture forecasts;
+- P(Home), P(Draw), and P(Away);
+- most likely outcome and forecast confidence;
+- prediction timestamps and training cutoffs;
+- completed predictions and final results;
+- RPS, Log Loss, and Brier Score;
+- cumulative live RPS;
+- basic system-status information.
 
 The dashboard does not run model training and does not write to the prediction ledger. Forecast generation and result reconciliation remain separate backend operations.
 
@@ -480,6 +523,7 @@ http://localhost:8501
 Streamlit Community Cloud is connected to the GitHub repository. Commits pushed to `main` are therefore reflected automatically in the deployed application.
 
 ---
+
 ## Repository structure
 
 Important production and modelling locations include:
@@ -500,7 +544,11 @@ data/
 predictions/
     ledger.csv
 
+results/
+    heldout_rps_block_bootstrap.csv
+
 scripts/
+    block_bootstrap_rps.py
     generate_prekick_v1_predictions.py
     reconcile_live_ledger.py
     refresh_live_data.py
@@ -551,22 +599,22 @@ Current status:
 
 The tests cover the statistical and production components including:
 
-* data-source normalization;
-* Elo;
-* Poisson probabilities;
-* goal-model fitting;
-* Dixon-Coles adjustments;
-* ensembles;
-* multinomial modelling;
-* preprocessing;
-* probabilistic scoring;
-* live training-count validation;
-* fixture and prediction-count validation;
-* live-ledger duplicate protection;
-* result reconciliation;
-* fixture-batch classification;
-* immutable prediction protection;
-* prospective prediction timing, including rejection of forecasts at or after kickoff.
+- data-source normalization;
+- Elo;
+- Poisson probabilities;
+- goal-model fitting;
+- Dixon-Coles adjustments;
+- ensembles;
+- multinomial modelling;
+- preprocessing;
+- probabilistic scoring;
+- live training-count validation;
+- fixture and prediction-count validation;
+- live-ledger duplicate protection;
+- result reconciliation;
+- fixture-batch classification;
+- immutable prediction protection;
+- prospective prediction timing, including rejection of forecasts at or after kickoff.
 
 ---
 
@@ -697,22 +745,22 @@ Market data:    External benchmark only
 
 The current production system includes:
 
-* leakage-safe historical backtesting;
-* a frozen versioned production model;
-* prospective prediction timestamps and training cutoffs;
-* an immutable live prediction ledger;
-* football-data.org ingestion;
-* automated fixture and result refresh;
-* result reconciliation;
-* automated RPS, Log Loss, and Brier scoring;
-* duplicate forecast protection;
-* mixed-batch protection;
-* rejection of forecasts made at or after kickoff;
-* 114 automated tests;
-* a read-only Streamlit dashboard;
-* Docker support;
-* scheduled GitHub Actions;
-* public deployment on Streamlit Community Cloud.
+- leakage-safe historical backtesting;
+- a frozen versioned production model;
+- prospective prediction timestamps and training cutoffs;
+- an immutable live prediction ledger;
+- football-data.org ingestion;
+- automated fixture and result refresh;
+- result reconciliation;
+- automated RPS, Log Loss, and Brier scoring;
+- duplicate forecast protection;
+- mixed-batch protection;
+- rejection of forecasts made at or after kickoff;
+- 114 automated tests;
+- a read-only Streamlit dashboard;
+- Docker support;
+- scheduled GitHub Actions;
+- public deployment on Streamlit Community Cloud.
 
 Prekick v1 should not be retuned in response to individual live results. Any future modelling change should be introduced as a separately versioned model, for example `prekick_v2`, while preserving every historical `prekick_v1` forecast.
 
@@ -730,9 +778,11 @@ Predictions use only information available before the relevant fixture.
 
 The production generator rejects a prediction batch if any fixture kickoff is at or before the prediction timestamp.
 
-### No held-out retuning
+### Historical selection disclosure
 
-Model choices are not changed because of performance observed on the held-out backtest.
+The protected validation period was used to select the 25% Elo / 75% Poisson ensemble before held-out evaluation. After the held-out comparison was observed, the fixed 50/50 ensemble was chosen as `prekick_v1` because it had the lowest observed non-market held-out RPS.
+
+The project therefore treats the 50/50 held-out score as selection-conditioned. It is not presented as an untouched estimate of future `prekick_v1` performance.
 
 ### No live-result retuning
 
