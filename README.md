@@ -823,6 +823,14 @@ https://github.com/aahmed101521/Prekick
 
 ---
 
+## Data attribution
+
+Football data provided by the [Football-Data.org API](https://www.football-data.org/).
+
+Third-party football data included or generated through the project remain subject to the terms and rights of their respective data providers and are not covered by the repository's source-code license.
+
+---
+
 ## Disclaimer
 
 Prekick is a statistical modelling and research project.

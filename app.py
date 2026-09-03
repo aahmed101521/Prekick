@@ -619,3 +619,11 @@ with st.expander("System status"):
         hide_index=True,
         width="stretch",
     )
+
+
+st.divider()
+
+st.caption(
+    "Football data provided by the "
+    "[Football-Data.org API](https://www.football-data.org/)."
+)
