@@ -19,8 +19,20 @@ jobs:
 
     env:
       FOOTBALL_DATA_API_KEY: ${{ secrets.FOOTBALL_DATA_API_KEY }}
+      HEALTHCHECKS_PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL }}
 
     steps:
+      - name: Signal pipeline start
+        shell: bash
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --max-time 20 \
+            "${HEALTHCHECKS_PING_URL}/start" || true
+
       - name: Check out repository
         uses: actions/checkout@v7
         with:
@@ -60,3 +72,26 @@ jobs:
             git commit -m "Update Prekick live data"
             git push
           fi
+
+      - name: Signal pipeline success
+        if: success()
+        shell: bash
+        run: |
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --max-time 20 \
+            "${HEALTHCHECKS_PING_URL}"
+
+      - name: Signal pipeline failure
+        if: failure()
+        shell: bash
+        run: |
+          curl \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --max-time 20 \
+            "${HEALTHCHECKS_PING_URL}/fail" || true
