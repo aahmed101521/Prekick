@@ -1,6 +1,7 @@
 import pytest
 
 from prekick.data_sources import (
+    build_live_data,
     completed_matches_dataframe,
     completed_results_dataframe,
     normalise_team,
@@ -443,3 +444,23 @@ def test_validate_premier_league_schedule_rejects_duplicate_pairing():
             matches
         )
 
+
+def test_build_live_data_rejects_incomplete_schedule(
+    monkeypatch,
+):
+    matches = _complete_test_schedule()
+    matches.pop()
+
+    monkeypatch.setattr(
+        "prekick.data_sources.fetch_premier_league_matches",
+        lambda **kwargs: matches,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="must contain 380 fixtures",
+    ):
+        build_live_data(
+            api_key="test-key",
+            season_start=2026,
+        )

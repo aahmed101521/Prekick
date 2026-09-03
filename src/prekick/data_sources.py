@@ -308,7 +308,6 @@ def normalise_team(team):
     )
 
 
-
 def validate_premier_league_schedule(
     matches,
 ):
@@ -877,6 +876,10 @@ def build_live_data(
             api_key=api_key,
             season_start=season_start,
         )
+    )
+
+    validate_premier_league_schedule(
+        matches
     )
 
     completed = (
