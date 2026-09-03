@@ -12,6 +12,11 @@ FOOTBALL_DATA_API_URL = (
 DEFAULT_SEASON_START = 2026
 DEFAULT_TIMEOUT_SECONDS = 30
 
+EXPECTED_EPL_TEAMS = 20
+EXPECTED_EPL_MATCHWEEKS = 38
+EXPECTED_EPL_FIXTURES_PER_MATCHWEEK = 10
+EXPECTED_EPL_FIXTURES = 380
+
 UPCOMING_STATUSES = {
     "SCHEDULED",
     "TIMED",
@@ -301,6 +306,128 @@ def normalise_team(team):
         "Unknown football-data.org team: "
         + " / ".join(available_names)
     )
+
+
+
+def validate_premier_league_schedule(
+    matches,
+):
+    if len(matches) != EXPECTED_EPL_FIXTURES:
+        raise ValueError(
+            "Premier League season schedule "
+            f"must contain {EXPECTED_EPL_FIXTURES} fixtures; "
+            f"found {len(matches)}."
+        )
+
+    teams = set()
+    ordered_pairings = set()
+    teams_by_matchweek = {
+        matchweek: set()
+        for matchweek in range(
+            1,
+            EXPECTED_EPL_MATCHWEEKS + 1,
+        )
+    }
+    fixtures_by_matchweek = {
+        matchweek: 0
+        for matchweek in range(
+            1,
+            EXPECTED_EPL_MATCHWEEKS + 1,
+        )
+    }
+
+    for match in matches:
+        matchday = match.get("matchday")
+        if matchday is None:
+            raise ValueError(
+                "Premier League fixture has no matchday."
+            )
+
+        matchweek = int(matchday)
+        if matchweek not in fixtures_by_matchweek:
+            raise ValueError(
+                "Premier League fixture has invalid matchday: "
+                f"{matchweek}."
+            )
+
+        home_team, _ = normalise_team(
+            match["homeTeam"]
+        )
+        away_team, _ = normalise_team(
+            match["awayTeam"]
+        )
+
+        if home_team == away_team:
+            raise ValueError(
+                "Premier League fixture has the same "
+                "home and away team."
+            )
+
+        pairing = (
+            home_team,
+            away_team,
+        )
+        if pairing in ordered_pairings:
+            raise ValueError(
+                "Duplicate Premier League home-away "
+                "pairing found in season schedule."
+            )
+
+        ordered_pairings.add(pairing)
+        teams.update(
+            [
+                home_team,
+                away_team,
+            ]
+        )
+
+        fixtures_by_matchweek[matchweek] += 1
+
+        matchweek_teams = teams_by_matchweek[matchweek]
+        if (
+            home_team in matchweek_teams
+            or away_team in matchweek_teams
+        ):
+            raise ValueError(
+                "Premier League team appears more than "
+                "once in the same matchweek."
+            )
+
+        matchweek_teams.update(
+            [
+                home_team,
+                away_team,
+            ]
+        )
+
+    if len(teams) != EXPECTED_EPL_TEAMS:
+        raise ValueError(
+            "Premier League season schedule "
+            f"must contain {EXPECTED_EPL_TEAMS} teams; "
+            f"found {len(teams)}."
+        )
+
+    for matchweek in range(
+        1,
+        EXPECTED_EPL_MATCHWEEKS + 1,
+    ):
+        fixture_count = fixtures_by_matchweek[matchweek]
+        if fixture_count != EXPECTED_EPL_FIXTURES_PER_MATCHWEEK:
+            raise ValueError(
+                "Premier League matchweek "
+                f"{matchweek} must contain "
+                f"{EXPECTED_EPL_FIXTURES_PER_MATCHWEEK} "
+                f"fixtures; found {fixture_count}."
+            )
+
+        team_count = len(teams_by_matchweek[matchweek])
+        if team_count != EXPECTED_EPL_TEAMS:
+            raise ValueError(
+                "Premier League matchweek "
+                f"{matchweek} must contain "
+                f"{EXPECTED_EPL_TEAMS} teams; "
+                f"found {team_count}."
+            )
 
 
 def fetch_premier_league_matches(

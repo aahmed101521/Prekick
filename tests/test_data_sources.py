@@ -8,6 +8,7 @@ from prekick.data_sources import (
     season_label,
     season_slug,
     upcoming_fixtures_dataframe,
+    validate_premier_league_schedule,
 )
 
 
@@ -304,3 +305,141 @@ def test_completed_results_dataframe_includes_matchweek():
     assert row["home_goals"] == 3
     assert row["away_goals"] == 0
     assert row["result"] == "H"
+
+SCHEDULE_TEST_TEAMS = [
+    "Arsenal FC",
+    "AFC Bournemouth",
+    "Aston Villa FC",
+    "Brentford FC",
+    "Brighton & Hove Albion FC",
+    "Chelsea FC",
+    "Coventry City FC",
+    "Crystal Palace FC",
+    "Everton FC",
+    "Fulham FC",
+    "Hull City AFC",
+    "Ipswich Town FC",
+    "Leeds United FC",
+    "Liverpool FC",
+    "Manchester City FC",
+    "Manchester United FC",
+    "Newcastle United FC",
+    "Nottingham Forest FC",
+    "Sunderland AFC",
+    "Tottenham Hotspur FC",
+]
+
+
+def _complete_test_schedule():
+    teams = SCHEDULE_TEST_TEAMS.copy()
+    fixed_team = teams[0]
+    rotating = teams[1:]
+    first_half = []
+
+    for matchweek in range(1, 20):
+        order = [
+            fixed_team,
+            *rotating,
+        ]
+        round_fixtures = []
+
+        for index in range(10):
+            home_team = order[index]
+            away_team = order[-(index + 1)]
+
+            if (matchweek + index) % 2 == 0:
+                home_team, away_team = (
+                    away_team,
+                    home_team,
+                )
+
+            round_fixtures.append(
+                (
+                    home_team,
+                    away_team,
+                )
+            )
+
+        first_half.append(round_fixtures)
+        rotating = [
+            rotating[-1],
+            *rotating[:-1],
+        ]
+
+    matches = []
+
+    for first_half_index, round_fixtures in enumerate(
+        first_half,
+        start=1,
+    ):
+        for home_team, away_team in round_fixtures:
+            matches.append(
+                {
+                    "status": "SCHEDULED",
+                    "matchday": first_half_index,
+                    "utcDate": "2026-09-01T15:00:00Z",
+                    "homeTeam": {
+                        "name": home_team,
+                    },
+                    "awayTeam": {
+                        "name": away_team,
+                    },
+                }
+            )
+
+        for home_team, away_team in round_fixtures:
+            matches.append(
+                {
+                    "status": "SCHEDULED",
+                    "matchday": first_half_index + 19,
+                    "utcDate": "2027-01-01T15:00:00Z",
+                    "homeTeam": {
+                        "name": away_team,
+                    },
+                    "awayTeam": {
+                        "name": home_team,
+                    },
+                }
+            )
+
+    return matches
+
+
+def test_validate_premier_league_schedule_accepts_complete_schedule():
+    matches = _complete_test_schedule()
+
+    validate_premier_league_schedule(
+        matches
+    )
+
+
+def test_validate_premier_league_schedule_rejects_missing_fixture():
+    matches = _complete_test_schedule()
+    matches.pop()
+
+    with pytest.raises(
+        ValueError,
+        match="must contain 380 fixtures",
+    ):
+        validate_premier_league_schedule(
+            matches
+        )
+
+
+def test_validate_premier_league_schedule_rejects_duplicate_pairing():
+    matches = _complete_test_schedule()
+
+    matches[-1] = {
+        **matches[-1],
+        "homeTeam": matches[0]["homeTeam"].copy(),
+        "awayTeam": matches[0]["awayTeam"].copy(),
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Duplicate Premier League home-away pairing",
+    ):
+        validate_premier_league_schedule(
+            matches
+        )
+
