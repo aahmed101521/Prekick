@@ -594,7 +594,7 @@ pytest
 Current status:
 
 ```text
-114 passed
+118 passed
 ```
 
 The tests cover the statistical and production components including:
@@ -610,6 +610,7 @@ The tests cover the statistical and production components including:
 - probabilistic scoring;
 - live training-count validation;
 - fixture and prediction-count validation;
+- full-season EPL schedule completeness validation;
 - live-ledger duplicate protection;
 - result reconciliation;
 - fixture-batch classification;
@@ -662,14 +663,15 @@ python scripts\run_live_pipeline.py
 A single run performs the following sequence:
 
 1. fetch current Premier League match data from `football-data.org`;
-2. update completed-match and upcoming-fixture CSV files;
-3. reconcile completed results with existing ledger rows;
-4. score completed predictions;
-5. inspect the upcoming fixture batch;
-6. generate Prekick v1 forecasts only when the full batch is new;
-7. skip generation safely when the full batch is already predicted;
-8. stop on mixed or otherwise unsafe fixture batches;
-9. preserve all existing prediction-time fields.
+2. validate the full EPL season schedule for structural completeness;
+3. derive and update completed-match and upcoming-fixture CSV files;
+4. reconcile completed results with existing ledger rows;
+5. score completed predictions;
+6. inspect the upcoming fixture batch;
+7. generate Prekick v1 forecasts only when the full batch is new;
+8. skip generation safely when the full batch is already predicted;
+9. stop on mixed or otherwise unsafe fixture batches;
+10. preserve all existing prediction-time fields.
 
 The production workflow is also automated through:
 
@@ -751,12 +753,13 @@ The current production system includes:
 - an immutable live prediction ledger;
 - football-data.org ingestion;
 - automated fixture and result refresh;
+- full-season EPL schedule completeness protection;
 - result reconciliation;
 - automated RPS, Log Loss, and Brier scoring;
 - duplicate forecast protection;
 - mixed-batch protection;
 - rejection of forecasts made at or after kickoff;
-- 114 automated tests;
+- 118 automated tests;
 - a read-only Streamlit dashboard;
 - Docker support;
 - scheduled GitHub Actions;
