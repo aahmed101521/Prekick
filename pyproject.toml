@@ -7,14 +7,14 @@ name = "prekick"
 version = "0.1.0"
 requires-python = ">=3.13"
 dependencies = [
-    "numpy",
-    "pandas",
-    "requests",
-    "scipy",
+    "numpy==2.5.3",
+    "pandas==3.0.6",
+    "requests==2.34.2",
+    "scipy==1.18.1",
     "streamlit==1.63.0"
 ]
 
 [dependency-groups]
 test = [
-    "pytest"
+    "pytest==9.1.1"
 ]
