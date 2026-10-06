@@ -3,3 +3,7 @@ __pycache__/
 *.egg-info/
 data/raw/*.csv
 data/processed/*.csv
+
+# Frozen Prekick v1 production artifacts
+!data/processed/model_data.csv
+!data/processed/elo_history.csv
