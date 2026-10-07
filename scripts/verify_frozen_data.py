@@ -4,24 +4,26 @@ import hashlib
 from pathlib import Path
 
 
+# These hashes use a canonical LF (\n) representation so that the integrity
+# check is identical on Windows and Linux. Git may check out text files with
+# CRLF on Windows and LF on Linux even when their actual data are unchanged.
 EXPECTED_HASHES = {
     Path("data/processed/model_data.csv"): (
-        "53a49e6459909044004e68bae5c30d5c225f00a5458a67b17156f94783d29886"
+        "2a5c0280bd18992b9f906edec29f25467b0227a73ec90ba82c90fe0558127e24"
     ),
     Path("data/processed/elo_history.csv"): (
-        "b14a7b0a5bcc299739b981bbaf7136680603d780b2deda2e9dbafd18da3f5aac"
+        "be0f360f49c841cca92b9e7a5892b0651951450a64daba362e76c02bb653953e"
     ),
 }
 
 
 def sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
+    data = path.read_bytes()
 
-    with path.open("rb") as file:
-        for chunk in iter(lambda: file.read(1024 * 1024), b""):
-            digest.update(chunk)
+    # Canonicalize Windows CRLF line endings to LF before hashing.
+    canonical_data = data.replace(b"\r\n", b"\n")
 
-    return digest.hexdigest()
+    return hashlib.sha256(canonical_data).hexdigest()
 
 
 def main() -> None:
@@ -39,15 +41,15 @@ def main() -> None:
                 "\n".join(
                     [
                         f"Frozen production artifact changed: {path}",
-                        f"Expected SHA-256: {expected_hash}",
-                        f"Actual SHA-256:   {actual_hash}",
+                        f"Expected canonical SHA-256: {expected_hash}",
+                        f"Actual canonical SHA-256:   {actual_hash}",
                     ]
                 )
             )
             continue
 
         print(f"Verified: {path}")
-        print(f"SHA-256:  {actual_hash}")
+        print(f"Canonical SHA-256: {actual_hash}")
 
     if failures:
         raise SystemExit(
