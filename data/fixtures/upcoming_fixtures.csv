@@ -1,2 +1,11 @@
 fixture_id,season,matchweek,kickoff_utc,home_team,away_team
-2026-27_mw07_tottenham-hotspur_coventry-city,2026_27,7,2026-10-19T19:00:00Z,Tottenham,Coventry City
+2026-27_mw08_ipswich_nottingham-forest,2026_27,8,2026-10-23T19:00:00Z,Ipswich,Nott'm Forest
+2026-27_mw08_aston-villa_manchester-city,2026_27,8,2026-10-24T11:30:00Z,Aston Villa,Man City
+2026-27_mw08_arsenal_everton,2026_27,8,2026-10-24T14:00:00Z,Arsenal,Everton
+2026-27_mw08_coventry-city_fulham,2026_27,8,2026-10-24T14:00:00Z,Coventry City,Fulham
+2026-27_mw08_chelsea_tottenham-hotspur,2026_27,8,2026-10-24T16:30:00Z,Chelsea,Tottenham
+2026-27_mw08_crystal-palace_newcastle-united,2026_27,8,2026-10-25T14:00:00Z,Crystal Palace,Newcastle
+2026-27_mw08_hull-city_brentford,2026_27,8,2026-10-25T14:00:00Z,Hull City,Brentford
+2026-27_mw08_liverpool_brighton,2026_27,8,2026-10-25T14:00:00Z,Liverpool,Brighton
+2026-27_mw08_manchester-united_bournemouth,2026_27,8,2026-10-25T14:00:00Z,Man United,Bournemouth
+2026-27_mw08_sunderland_leeds,2026_27,8,2026-10-25T16:30:00Z,Sunderland,Leeds
